@@ -1,0 +1,3 @@
+/Users/romansulgan/CLionProjects/compiler-language/cmake-build-debug/CMakeFiles/compiler_language.dir
+/Users/romansulgan/CLionProjects/compiler-language/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/romansulgan/CLionProjects/compiler-language/cmake-build-debug/CMakeFiles/rebuild_cache.dir
