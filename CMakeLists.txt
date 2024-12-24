@@ -6,4 +6,6 @@ set(CMAKE_CXX_STANDARD 14)
 include_directories(.)
 
 add_executable(compiler_language
-        main.cpp)
+        main.cpp
+        Lexer.h
+)
