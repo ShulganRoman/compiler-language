@@ -47,17 +47,18 @@ public:
     int line;                       // для отладки
     int col;                        // для отладки
 
-    Token(std::string name = "none",
-          TypeOfVar type = TypeOfVar::_unknown,
-          std::optional<TypeOfVar> number_type = std::nullopt,
-          int line = 0,
-          int col  = 0)
-            : name(std::move(name)),
-              type(type),
-              number_type(number_type),
-              line(line),
-              col(col)
-    {}
+    Token(
+            std::string name = "none",
+            TypeOfVar type = TypeOfVar::_unknown,
+            std::optional<TypeOfVar> number_type = std::nullopt,
+            int line = 0,
+            int col = 0
+    ) :
+            name(std::move(name)),
+            type(type),
+            number_type(number_type),
+            line(line),
+            col(col) {}
 };
 
 class Lexer {
@@ -178,7 +179,7 @@ private:
 
     Token parseString() {
         int startLine = line;
-        int startCol  = col;
+        int startCol = col;
 
         // Пропускаем начальную кавычку
         advance();
@@ -219,15 +220,15 @@ private:
 
     std::optional<Token> parseMultiCharOperator() {
         int startLine = line;
-        int startCol  = col;
+        int startCol = col;
         if (isEOF()) return std::nullopt;
 
         std::string twoChars(1, peek());
         if (position + 1 < text.size()) {
-            twoChars.push_back(text[position+1]);
+            twoChars.push_back(text[position + 1]);
         }
 
-        for (auto &op : multiCharOps) {
+        for (auto &op: multiCharOps) {
             if (twoChars == op) {
                 advance();
                 advance();
@@ -251,7 +252,7 @@ private:
 
     Token parseNumber() {
         int startLine = line;
-        int startCol  = col;
+        int startCol = col;
 
         std::string value;
         bool hasDot = false;
@@ -272,7 +273,7 @@ private:
 
     Token parseIdentifierOrKeyword() {
         int startLine = line;
-        int startCol  = col;
+        int startCol = col;
 
         std::string value;
         while (!isEOF() && (std::isalnum(peek()) || peek() == '_')) {
@@ -320,7 +321,7 @@ private:
     }
 
     Token makeToken(const std::string &name, TypeOfVar type) {
-        return Token(name, type, std::nullopt, line, col - (int)name.size());
+        return Token(name, type, std::nullopt, line, col - (int) name.size());
     }
 };
 

@@ -1,6 +1,3 @@
-#include <iostream>
-#include <cstring>
-
 typedef int integer;
 
 void sort(integer* sp, integer len) {

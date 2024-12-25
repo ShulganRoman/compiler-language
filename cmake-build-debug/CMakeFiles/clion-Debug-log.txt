@@ -1,4 +1,4 @@
-/Users/romansulgan/Applications/CLion.app/Contents/bin/cmake/mac/aarch64/bin/cmake -DCMAKE_BUILD_TYPE=Debug -G "Unix Makefiles" -S /Users/romansulgan/CLionProjects/compiler-language -B /Users/romansulgan/CLionProjects/compiler-language/cmake-build-debug
--- Configuring done (0.0s)
+/Users/romansulgan/Applications/CLion.app/Contents/bin/cmake/mac/aarch64/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++ -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++ -G "Unix Makefiles" -S /Users/romansulgan/CLionProjects/compiler-language -B /Users/romansulgan/CLionProjects/compiler-language/cmake-build-debug
+-- Configuring done (0.1s)
 -- Generating done (0.0s)
 -- Build files have been written to: /Users/romansulgan/CLionProjects/compiler-language/cmake-build-debug

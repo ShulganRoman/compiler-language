@@ -39,8 +39,8 @@ inline std::string astNodeTypeToString(ASTNodeType t) {
         case ASTNodeType::Literal:       return "Literal";
         case ASTNodeType::Identifier:    return "Identifier";
         case ASTNodeType::Parameter:     return "Parameter";
+        default:                         return "Unknown";
     }
-    return "Unknown";
 }
 
 // Узел AST
