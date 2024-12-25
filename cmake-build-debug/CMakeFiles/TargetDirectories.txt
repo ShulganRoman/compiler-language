@@ -1,3 +1,9 @@
+/Users/romansulgan/CLionProjects/compiler-language/cmake-build-debug/CMakeFiles/intrinsics_gen.dir
+/Users/romansulgan/CLionProjects/compiler-language/cmake-build-debug/CMakeFiles/omp_gen.dir
+/Users/romansulgan/CLionProjects/compiler-language/cmake-build-debug/CMakeFiles/acc_gen.dir
+/Users/romansulgan/CLionProjects/compiler-language/cmake-build-debug/CMakeFiles/ARMTargetParserTableGen.dir
+/Users/romansulgan/CLionProjects/compiler-language/cmake-build-debug/CMakeFiles/AArch64TargetParserTableGen.dir
+/Users/romansulgan/CLionProjects/compiler-language/cmake-build-debug/CMakeFiles/RISCVTargetParserTableGen.dir
 /Users/romansulgan/CLionProjects/compiler-language/cmake-build-debug/CMakeFiles/compiler_language.dir
 /Users/romansulgan/CLionProjects/compiler-language/cmake-build-debug/CMakeFiles/edit_cache.dir
 /Users/romansulgan/CLionProjects/compiler-language/cmake-build-debug/CMakeFiles/rebuild_cache.dir

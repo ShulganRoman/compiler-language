@@ -92,6 +92,7 @@ compiler_language_EXTERNAL_OBJECTS =
 
 compiler_language: CMakeFiles/compiler_language.dir/main.cpp.o
 compiler_language: CMakeFiles/compiler_language.dir/build.make
+compiler_language: /opt/homebrew/opt/llvm/lib/libLLVM.dylib
 compiler_language: CMakeFiles/compiler_language.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/romansulgan/CLionProjects/compiler-language/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable compiler_language"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/compiler_language.dir/link.txt --verbose=$(VERBOSE)

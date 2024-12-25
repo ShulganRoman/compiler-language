@@ -1,4 +1,13 @@
 /Users/romansulgan/Applications/CLion.app/Contents/bin/cmake/mac/aarch64/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++ -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++ -G "Unix Makefiles" -S /Users/romansulgan/CLionProjects/compiler-language -B /Users/romansulgan/CLionProjects/compiler-language/cmake-build-debug
--- Configuring done (0.1s)
+-- Performing Test HAVE_FFI_CALL
+-- Performing Test HAVE_FFI_CALL - Success
+-- Found FFI: /Library/Developer/CommandLineTools/SDKs/MacOSX15.1.sdk/usr/lib/libffi.tbd
+-- Looking for histedit.h
+-- Looking for histedit.h - found
+-- Found LibEdit: /Library/Developer/CommandLineTools/SDKs/MacOSX15.1.sdk/usr/include (found version "2.11")
+-- Found ZLIB: /Library/Developer/CommandLineTools/SDKs/MacOSX15.1.sdk/usr/lib/libz.tbd (found version "1.2.12")
+-- Found zstd: /opt/homebrew/lib/libzstd.dylib
+-- Found LibXml2: /Library/Developer/CommandLineTools/SDKs/MacOSX15.1.sdk/usr/lib/libxml2.tbd (found version "2.9.13")
+-- Configuring done (1.0s)
 -- Generating done (0.0s)
 -- Build files have been written to: /Users/romansulgan/CLionProjects/compiler-language/cmake-build-debug

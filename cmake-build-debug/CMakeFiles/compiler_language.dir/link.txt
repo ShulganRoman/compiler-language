@@ -1,1 +1,1 @@
-/opt/homebrew/opt/llvm/bin/clang++ -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.1.sdk -Wl,-search_paths_first -Wl,-headerpad_max_install_names -L/opt/homebrew/opt/llvm/lib CMakeFiles/compiler_language.dir/main.cpp.o -o compiler_language
+/opt/homebrew/opt/llvm/bin/clang++ -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.1.sdk -Wl,-search_paths_first -Wl,-headerpad_max_install_names -L/opt/homebrew/opt/llvm/lib CMakeFiles/compiler_language.dir/main.cpp.o -o compiler_language  /opt/homebrew/opt/llvm/lib/libLLVM.dylib

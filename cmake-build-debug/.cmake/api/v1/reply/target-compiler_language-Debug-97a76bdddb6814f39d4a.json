@@ -11,6 +11,7 @@
 		"commands" : 
 		[
 			"add_executable",
+			"target_link_libraries",
 			"include_directories"
 		],
 		"files" : 
@@ -25,13 +26,19 @@
 			{
 				"command" : 0,
 				"file" : 0,
-				"line" : 8,
+				"line" : 13,
 				"parent" : 0
 			},
 			{
 				"command" : 1,
 				"file" : 0,
-				"line" : 6,
+				"line" : 14,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 9,
 				"parent" : 0
 			}
 		]
@@ -42,14 +49,14 @@
 			"compileCommandFragments" : 
 			[
 				{
-					"fragment" : "-g -std=gnu++14 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.1.sdk -fcolor-diagnostics"
+					"fragment" : "-g -std=gnu++17 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.1.sdk -fcolor-diagnostics   -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS"
 				}
 			],
 			"includes" : 
 			[
 				{
-					"backtrace" : 2,
-					"path" : "/Users/romansulgan/CLionProjects/compiler-language/."
+					"backtrace" : 3,
+					"path" : "/opt/homebrew/opt/llvm/include"
 				}
 			],
 			"language" : "CXX",
@@ -59,7 +66,7 @@
 				[
 					1
 				],
-				"standard" : "14"
+				"standard" : "17"
 			},
 			"sourceIndexes" : 
 			[
@@ -79,6 +86,11 @@
 			{
 				"fragment" : "-L/opt/homebrew/opt/llvm/lib",
 				"role" : "flags"
+			},
+			{
+				"backtrace" : 2,
+				"fragment" : "/opt/homebrew/opt/llvm/lib/libLLVM.dylib",
+				"role" : "libraries"
 			}
 		],
 		"language" : "CXX"
