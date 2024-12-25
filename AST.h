@@ -6,7 +6,6 @@
 #include <vector>
 #include <string>
 
-
 enum class ASTNodeType {
     Program,
     VarDecl,
@@ -44,6 +43,7 @@ inline std::string astNodeTypeToString(ASTNodeType t) {
     return "Unknown";
 }
 
+// Узел AST
 struct ASTNode {
     ASTNodeType type;
     std::string value;
@@ -51,7 +51,6 @@ struct ASTNode {
 
     ASTNode(ASTNodeType t, std::string v)
             : type(t), value(std::move(v)) {}
-
 
     ASTNode()
             : type(ASTNodeType::Literal),
@@ -62,6 +61,7 @@ struct ASTNode {
     }
 };
 
+// Парсер
 class Parser {
 public:
     explicit Parser(std::vector<Token> tokens)
@@ -79,142 +79,220 @@ private:
     std::vector<Token> tokens;
     size_t position;
 
-    //=== Методы доступа к токенам ===//
     Token currentToken() const {
         if (position < tokens.size()) {
             return tokens[position];
         }
         return Token("EOF", TypeOfVar::_unknown, std::nullopt, -1, -1);
     }
+
     bool isAtEnd() const {
         return position >= tokens.size();
     }
+
     Token advance() {
         if (!isAtEnd()) {
             return tokens[position++];
         }
         return Token("EOF", TypeOfVar::_unknown, std::nullopt, -1, -1);
     }
+
     bool match(TypeOfVar t) const {
         if (isAtEnd()) return false;
         return (currentToken().type == t);
     }
+
     bool match(TypeOfVar t, const std::string &name) const {
         if (isAtEnd()) return false;
         return (currentToken().type == t && currentToken().name == name);
     }
-    bool check(TypeOfVar t) const {
-        return match(t);
+
+    bool isRealTypeKeyword(const std::string &kw) const {
+        return (kw == "integer" || kw == "float" || kw == "bool" || kw == "string" || kw == "void");
     }
 
-    bool isTypeKeyword() const {
-        if (!match(TypeOfVar::_keyword)) return false;
-        std::string kw = currentToken().name;
-        return (kw == "integer" || kw == "float" ||
-                kw == "bool"    || kw == "string" ||
-                kw == "void");
-    }
-
-    ASTNode parseTopLevelDecl() {
-        if (isTypeKeyword()) {
-            Token typeKw = advance();
-            bool isPointer = false;
-            if (match(TypeOfVar::_operator, "*")) {
+    // parseModifiers() — считывает подряд static/const возвращая строку
+    std::string parseModifiers() {
+        std::string mods;
+        while (!isAtEnd() && match(TypeOfVar::_keyword)) {
+            std::string kw = currentToken().name;
+            if (kw == "static" || kw == "const") {
+                if (!mods.empty()) mods += " ";
+                mods += kw;
                 advance();
-                isPointer = true;
-            }
-            if (!match(TypeOfVar::_identifier)) {
-                throw std::runtime_error("Expected identifier after type keyword");
-            }
-            Token ident = advance();
-
-            if (match(TypeOfVar::_separator, "(")) {
-                // functionDecl
-                return parseFunctionDecl(typeKw, isPointer, ident);
             } else {
-                // varDecl
-                return parseVarDecl(typeKw, isPointer, ident);
+                break;
             }
         }
-        throw std::runtime_error("Expected type keyword at top-level, got: " + currentToken().name);
+        return mods;
     }
 
-    //=== function_decl -> type ('*')? ident '(' param_list? ')' block ===//
-    ASTNode parseFunctionDecl(const Token &typeKw, bool isPointer, const Token &funcIdent) {
-        // уже видим '('
-        advance(); // '('
+    // _keyword, который == integer/float/bool/...
+    bool isTypeKeyword() const {
+        if (isAtEnd()) return false;
+        if (currentToken().type != TypeOfVar::_keyword) return false;
+        std::string name = currentToken().name;
+        return isRealTypeKeyword(name);
+    }
 
-        ASTNode funcNode(ASTNodeType::FunctionDecl, typeKw.name + (isPointer ? "*" : ""));
+    // program -> topLevelDecl*
+    ASTNode parseTopLevelDecl() {
+        std::string mods = parseModifiers();
+
+        if (!isTypeKeyword()) {
+            throw std::runtime_error(
+                    "Expected type keyword at top-level, got: " + currentToken().name
+            );
+        }
+
+        Token typeKw = advance();
+
+        bool isPointer = false;
+        if (match(TypeOfVar::_operator, "*")) {
+            advance();
+            isPointer = true;
+        }
+
+        if (!match(TypeOfVar::_identifier)) {
+            throw std::runtime_error("Expected identifier after type keyword");
+        }
+        Token ident = advance(); // e.g. "eratosthenes_sieve"
+
+        // Если дальше '(' => это функция
+        if (match(TypeOfVar::_separator, "(")) {
+            return parseFunctionDecl(mods, typeKw, isPointer, ident);
+        } else {
+            return parseVarDecl(mods, typeKw, isPointer, ident);
+        }
+    }
+
+
+    // function_decl -> (mods?) type(' *')? ident '(' param_list? ')' block
+    ASTNode parseFunctionDecl(const std::string &mods,
+                              const Token &typeKw,
+                              bool isPointer,
+                              const Token &funcIdent)
+    {
+        advance();
+
+        std::string fullType;
+        if (!mods.empty()) {
+            fullType = mods + " ";
+        }
+        fullType += typeKw.name;
+        if (isPointer) fullType += "*";
+
+        ASTNode funcNode(ASTNodeType::FunctionDecl, fullType);
+
         ASTNode funcName(ASTNodeType::Identifier, funcIdent.name);
         funcNode.addChild(funcName);
 
         if (!match(TypeOfVar::_separator, ")")) {
             parseParameterList(funcNode);
         }
+
         if (!match(TypeOfVar::_separator, ")")) {
             throw std::runtime_error("Expected ')' in function declaration");
         }
         advance(); // ')'
 
-        // block
         ASTNode blockNode = parseBlock();
         funcNode.addChild(blockNode);
 
         return funcNode;
     }
 
-    //=== param_list -> param (',' param)* ===//
+    // param_list -> param (',' param)*
+    // param -> (mods?) type(' *')? ident
     void parseParameterList(ASTNode &funcNode) {
+
         parseOneParameter(funcNode);
+
         while (match(TypeOfVar::_separator, ",")) {
             advance(); // ','
             parseOneParameter(funcNode);
         }
     }
-    //=== param -> type ('*')? ident ===//
+
     void parseOneParameter(ASTNode &funcNode) {
         if (!isTypeKeyword()) {
             throw std::runtime_error("Expected type keyword in parameter list");
         }
-        Token paramType = advance();
+        Token paramType = advance(); // e.g. "integer"
+
+        // Проверяем '*'
         bool isPtr = false;
         if (match(TypeOfVar::_operator, "*")) {
             advance();
             isPtr = true;
         }
+
+        // Ожидаем идентификатор
         if (!match(TypeOfVar::_identifier)) {
-            throw std::runtime_error("Expected identifier after type keyword in param");
+            throw std::runtime_error("Expected identifier after type in parameter");
         }
         Token paramIdent = advance();
 
-        ASTNode paramNode(ASTNodeType::Parameter, paramType.name + (isPtr ? "*" : ""));
+        std::string typeName = paramType.name + (isPtr?"*":"");
+        ASTNode paramNode(ASTNodeType::Parameter, typeName);
+
         ASTNode paramName(ASTNodeType::Identifier, paramIdent.name);
         paramNode.addChild(paramName);
 
         funcNode.addChild(paramNode);
     }
 
-    //=== var_decl -> type(' *')? ident ('=' assignmentExpr)? ';' ===//
-    ASTNode parseVarDecl(const Token &typeKw, bool isPointer, const Token &ident) {
-        ASTNode varDecl(ASTNodeType::VarDecl, typeKw.name + (isPointer ? "*" : ""));
+    // var_decl -> (mods?) type(' *')? ident arrayDims? ('=' assignmentExpr)? ';'
+    ASTNode parseVarDecl(const std::string &mods,
+                         const Token &typeKw,
+                         bool isPointer,
+                         const Token &ident)
+    {
+        // e.g. fullType = "static const integer*"
+        std::string fullType = (mods.empty() ? "" : (mods + " "))
+                               + typeKw.name
+                               + (isPointer ? "*" : "");
+        ASTNode varDecl(ASTNodeType::VarDecl, fullType);
+
         ASTNode varName(ASTNodeType::Identifier, ident.name);
         varDecl.addChild(varName);
 
+        parseArrayDims(varName);
+
+        // Если '=', инициализация
         if (match(TypeOfVar::_operator, "=")) {
             advance(); // '='
-            ASTNode expr = parseAssignmentExpr();
-            varDecl.addChild(expr);
+            ASTNode initExpr = parseAssignmentExpr();
+            varDecl.addChild(initExpr);
         }
 
+        // ожидаем ';'
         if (!match(TypeOfVar::_separator, ";")) {
             throw std::runtime_error("Expected ';' after var_decl");
         }
         advance(); // ';'
-
         return varDecl;
     }
 
-    //=== block -> '{' statement* '}' ===//
+
+    // parseArrayDims( ASTNode varName ) — считываем 0+ раз '[ <expr> ]'
+    void parseArrayDims(ASTNode &varName) {
+        while (match(TypeOfVar::_separator, "[")) {
+            advance(); // '['
+            ASTNode dimExpr = parseAssignmentExpr();
+            if (!match(TypeOfVar::_separator, "]")) {
+                throw std::runtime_error("Expected ']' after array dimension");
+            }
+            advance(); // ']'
+
+            ASTNode arrDim(ASTNodeType::BinaryOp, "arrayDim");
+            arrDim.addChild(dimExpr);
+
+            varName.addChild(arrDim);
+        }
+    }
+
+    // block -> '{' statement* '}'
     ASTNode parseBlock() {
         if (!match(TypeOfVar::_separator, "{")) {
             throw std::runtime_error("Expected '{' to start block");
@@ -222,9 +300,11 @@ private:
         advance(); // '{'
 
         ASTNode blockNode(ASTNodeType::Block, "{}");
+
         while (!isAtEnd() && !match(TypeOfVar::_separator, "}")) {
             blockNode.addChild(parseStatement());
         }
+
         if (!match(TypeOfVar::_separator, "}")) {
             throw std::runtime_error("Expected '}' at end of block");
         }
@@ -233,7 +313,7 @@ private:
         return blockNode;
     }
 
-    //=== statement -> if | while | for | return | var_decl | expr-stmt ===//
+    // statement -> if | while | for | return | var_decl | exprStatement
     ASTNode parseStatement() {
         // if
         if (match(TypeOfVar::_keyword, "if")) {
@@ -251,59 +331,66 @@ private:
         if (match(TypeOfVar::_keyword, "return")) {
             return parseReturnStatement();
         }
-        // var_decl
-        if (isTypeKeyword()) {
-            Token typeKw = advance();
-            bool isPtr = false;
-            if (match(TypeOfVar::_operator, "*")) {
-                advance();
-                isPtr = true;
+
+        // Если isTypeKeyword => varDecl
+        {
+            size_t oldPos = position;
+            std::string mods = parseModifiers(); // считываем, если есть static,const
+
+            if (isTypeKeyword()) {
+                // да, значит var_decl
+                Token typeKw = advance();
+                bool isPtr = false;
+                if (match(TypeOfVar::_operator, "*")) {
+                    advance();
+                    isPtr = true;
+                }
+                if (!match(TypeOfVar::_identifier)) {
+                    throw std::runtime_error("Expected identifier after type in statement");
+                }
+                Token ident = advance();
+                // запретим '(' => function decl in block
+                if (match(TypeOfVar::_separator, "(")) {
+                    throw std::runtime_error("Function declaration not allowed inside block");
+                }
+                return parseVarDecl(mods, typeKw, isPtr, ident);
+            } else {
+                // откат, если mods были, но не было типа
+                position = oldPos;
             }
-            if (!match(TypeOfVar::_identifier)) {
-                throw std::runtime_error("Expected identifier after type keyword in statement");
-            }
-            Token ident = advance();
-            if (match(TypeOfVar::_separator, "(")) {
-                throw std::runtime_error("FunctionDecl not allowed inside block");
-            }
-            return parseVarDecl(typeKw, isPtr, ident);
         }
-        // expression-statement
-        // (любое выражение, заканчивающееся ';')
-        return parseExprStatement();
+        // если не var_decl, тогда expression-statement
+        return parseExpressionStatement();
     }
 
-    //=== expression-statement -> assignmentExpr ';' ===//
-    // (или развернуто: expr -> assignment -> logicalOr …)
-    ASTNode parseExprStatement() {
+    // expressionStatement -> assignmentExpr ';'
+    ASTNode parseExpressionStatement() {
         ASTNode expr = parseAssignmentExpr();
-        // ожидаем ';'
         if (!match(TypeOfVar::_separator, ";")) {
             throw std::runtime_error("Expected ';' after expression statement");
         }
         advance(); // ';'
-
-        // Для AST можно либо создать узел Statement, либо вернуть сам expr
-        // Если хотим различать assignment vs. expr, смотрим корень expr.
         return expr;
     }
 
-    //=== for -> 'for' '(' for_init ';' (assignmentExpr?) ';' (assignmentExpr?) ')' block ===//
+
+    // for -> 'for' '(' for_init ';' condition ';' step ')' block
     ASTNode parseForStatement() {
-        advance(); // 'for'
+        advance(); // съедаем "for"
+
         if (!match(TypeOfVar::_separator, "(")) {
             throw std::runtime_error("Expected '(' after 'for'");
         }
         advance(); // '('
 
-        // parse for_init
         ASTNode initNode = parseForInitNoSemicolon();
+
+        // ожидаем ';'
         if (!match(TypeOfVar::_separator, ";")) {
             throw std::runtime_error("Expected ';' after for-init");
         }
         advance(); // ';'
 
-        // condition
         ASTNode condNode;
         if (!match(TypeOfVar::_separator, ";")) {
             condNode = parseAssignmentExpr();
@@ -315,7 +402,6 @@ private:
         }
         advance(); // ';'
 
-        // step
         ASTNode stepNode;
         if (!match(TypeOfVar::_separator, ")")) {
             stepNode = parseAssignmentExpr();
@@ -337,57 +423,75 @@ private:
         return forNode;
     }
 
-    //=== for_initNoSemicolon -> var_decl_no_semicolon | assignmentExpr | пусто ===//
+    // for_initNoSemicolon -> varDeclNoSemicolon | assignmentExpr | пусто
     ASTNode parseForInitNoSemicolon() {
-        // если ';' => пустое
+        // если сразу ';' => пусто
         if (match(TypeOfVar::_separator, ";")) {
             return ASTNode(ASTNodeType::Literal, "no_init");
         }
-        // если тип => varDeclNoSemicolon
-        if (isTypeKeyword()) {
-            Token typeKw = advance();
-            bool isPtr = false;
-            if (match(TypeOfVar::_operator, "*")) {
-                advance();
-                isPtr = true;
-            }
-            if (!match(TypeOfVar::_identifier)) {
-                throw std::runtime_error("Expected identifier in for-init");
-            }
-            Token ident = advance();
-            if (match(TypeOfVar::_separator, "(")) {
-                throw std::runtime_error("FuncDecl not allowed in for-init");
-            }
-            return parseVarDeclNoSemicolon(typeKw, isPtr, ident);
-        }
-        // иначе parseAssignmentExpr
-        // (не требуем ';', потому что ';' прочитаем в parseForStatement)
-        if (match(TypeOfVar::_identifier) || match(TypeOfVar::_number) || match(TypeOfVar::_boolean)
-            || match(TypeOfVar::_string) || match(TypeOfVar::_separator, "(")
-            || match(TypeOfVar::_operator, "!") || match(TypeOfVar::_operator, "-"))
+
+        // попробуем парсить modifiers + type => var_decl_noSemicolon
         {
+            size_t oldPos = position;
+            std::string mods = parseModifiers();
+            if (isTypeKeyword()) {
+                Token typeKw = advance();
+                bool isPtr = false;
+                if (match(TypeOfVar::_operator, "*")) {
+                    advance();
+                    isPtr = true;
+                }
+                if (!match(TypeOfVar::_identifier)) {
+                    throw std::runtime_error("Expected identifier in for-init");
+                }
+                Token ident = advance();
+                // не допускаем '(' => function
+                if (match(TypeOfVar::_separator, "(")) {
+                    throw std::runtime_error("Function decl not allowed in for-init");
+                }
+                // varDeclNoSemicolon
+                return parseVarDeclNoSemicolon(mods, typeKw, isPtr, ident);
+            } else {
+                // откат, если не было типа
+                position = oldPos;
+            }
+        }
+
+        // иначе parseAssignmentExpr
+        if (!isAtEnd()) {
             return parseAssignmentExpr();
         }
-        // пусто
         return ASTNode(ASTNodeType::Literal, "no_init");
     }
 
-    //=== var_declNoSemicolon -> type(' *')? ident ('=' assignmentExpr)? (без ';') ===//
-    ASTNode parseVarDeclNoSemicolon(const Token &typeKw, bool isPointer, const Token &ident) {
-        ASTNode varDecl(ASTNodeType::VarDecl, typeKw.name + (isPointer?"*":""));
-        varDecl.addChild(ASTNode(ASTNodeType::Identifier, ident.name));
+
+    // varDeclNoSemicolon -> (mods?) type(' *')? ident arrayDims? ('=' assignmentExpr)?
+    ASTNode parseVarDeclNoSemicolon(const std::string &mods,
+                                    const Token &typeKw,
+                                    bool isPointer,
+                                    const Token &ident)
+    {
+        std::string fullType = (mods.empty()? "" : mods + " ")
+                               + typeKw.name + (isPointer?"*":"");
+        ASTNode varDecl(ASTNodeType::VarDecl, fullType);
+
+        ASTNode varName(ASTNodeType::Identifier, ident.name);
+        varDecl.addChild(varName);
+
+        parseArrayDims(varName);
 
         if (match(TypeOfVar::_operator, "=")) {
             advance();
-            ASTNode expr = parseAssignmentExpr();
-            varDecl.addChild(expr);
+            ASTNode initExpr = parseAssignmentExpr();
+            varDecl.addChild(initExpr);
         }
         return varDecl;
     }
 
-    //=== if -> 'if' '(' assignmentExpr ')' block ( 'else' block )? ===//
+
+    // if -> 'if' '(' assignmentExpr ')' block ( 'else' block )?
     ASTNode parseIfStatement() {
-        advance(); // 'if'
+        advance(); // "if"
         if (!match(TypeOfVar::_separator, "(")) {
             throw std::runtime_error("Expected '(' after 'if'");
         }
@@ -404,16 +508,16 @@ private:
         ifNode.addChild(thenBlock);
 
         if (match(TypeOfVar::_keyword, "else")) {
-            advance(); // 'else'
+            advance();
             ASTNode elseBlock = parseBlock();
             ifNode.addChild(elseBlock);
         }
         return ifNode;
     }
 
-    //=== while -> 'while' '(' assignmentExpr ')' block ===//
+    // while -> 'while' '(' assignmentExpr ')' block
     ASTNode parseWhileStatement() {
-        advance(); // 'while'
+        advance(); // "while"
         if (!match(TypeOfVar::_separator, "(")) {
             throw std::runtime_error("Expected '(' after 'while'");
         }
@@ -431,14 +535,16 @@ private:
         return whileNode;
     }
 
-    //=== return -> 'return' assignmentExpr? ';' ===//
+
+    // return -> 'return' assignmentExpr? ';'
     ASTNode parseReturnStatement() {
         advance(); // 'return'
         if (match(TypeOfVar::_separator, ";")) {
+            // пустой return
             advance();
             return ASTNode(ASTNodeType::ReturnStmt, "return");
         }
-        // иначе парсим assignmentExpr
+        // иначе парсим expr
         ASTNode expr = parseAssignmentExpr();
         if (!match(TypeOfVar::_separator, ";")) {
             throw std::runtime_error("Expected ';' after return");
@@ -449,22 +555,27 @@ private:
         return ret;
     }
 
-    //=== parseAssignmentExpr -> parseLogicalOr ( '=' parseAssignmentExpr )? ===//
+
+    // assignmentExpr -> logicalOr ( assignmentOp assignmentExpr )?
+    // assignmentOp -> '=' | '+=' | '-=' | '*=' | '/=' ...
     ASTNode parseAssignmentExpr() {
         ASTNode left = parseLogicalOr();
-        // если видим '=', значит присваивание
-        if (!isAtEnd() && match(TypeOfVar::_operator, "=")) {
-            Token op = advance(); // '='
-            ASTNode right = parseAssignmentExpr();
-            ASTNode assignOp(ASTNodeType::BinaryOp, "=");
-            assignOp.addChild(left);
-            assignOp.addChild(right);
-            return assignOp;
+        if (!isAtEnd() && match(TypeOfVar::_operator)) {
+            std::string opStr = currentToken().name;
+            if (opStr == "=" || opStr == "+=" || opStr == "-=" || opStr == "*=" || opStr == "/=") {
+                advance(); // съедаем оператор
+                ASTNode right = parseAssignmentExpr();
+                ASTNode assignOp(ASTNodeType::BinaryOp, opStr);
+                assignOp.addChild(left);
+                assignOp.addChild(right);
+                return assignOp;
+            }
         }
         return left;
     }
 
-    //=== parseLogicalOr -> parseLogicalAnd ( '||' parseLogicalAnd )* ===//
+
+    // logicalOr -> logicalAnd ( '||' logicalAnd )*
     ASTNode parseLogicalOr() {
         ASTNode left = parseLogicalAnd();
         while (!isAtEnd() && match(TypeOfVar::_operator) && currentToken().name == "||") {
@@ -478,7 +589,8 @@ private:
         return left;
     }
 
-    //=== parseLogicalAnd -> parseEquality ( '&&' parseEquality )* ===//
+
+    // logicalAnd -> equality ( '&&' equality )*
     ASTNode parseLogicalAnd() {
         ASTNode left = parseEquality();
         while (!isAtEnd() && match(TypeOfVar::_operator) && currentToken().name == "&&") {
@@ -492,11 +604,12 @@ private:
         return left;
     }
 
-    //=== parseEquality -> parseComparison ( ('=='|'!=') parseComparison )* ===//
+
+    // equality -> comparison ( ('==' | '!=') comparison )*
     ASTNode parseEquality() {
         ASTNode left = parseComparison();
-        while (!isAtEnd() && match(TypeOfVar::_operator) &&
-               (currentToken().name == "==" || currentToken().name == "!=")) {
+        while (!isAtEnd() && match(TypeOfVar::_operator)
+               && (currentToken().name == "==" || currentToken().name == "!=")) {
             Token op = advance();
             ASTNode right = parseComparison();
             ASTNode binOp(ASTNodeType::BinaryOp, op.name);
@@ -507,12 +620,13 @@ private:
         return left;
     }
 
-    //=== parseComparison -> parseTerm ( ('<'|'>'|'<='|'>=') parseTerm )* ===//
+    // comparison -> term ( ('<' | '>' | '<=' | '>=') term )*
     ASTNode parseComparison() {
         ASTNode left = parseTerm();
-        while (!isAtEnd() && match(TypeOfVar::_operator) &&
-               (currentToken().name == "<"  || currentToken().name == ">"  ||
-                currentToken().name == "<=" || currentToken().name == ">=")) {
+        while (!isAtEnd() && match(TypeOfVar::_operator)
+               && (currentToken().name == "<" || currentToken().name == ">"
+                   || currentToken().name == "<=" || currentToken().name == ">="))
+        {
             Token op = advance();
             ASTNode right = parseTerm();
             ASTNode binOp(ASTNodeType::BinaryOp, op.name);
@@ -523,11 +637,12 @@ private:
         return left;
     }
 
-    //=== parseTerm -> parseFactor ( ('+'|'-') parseFactor )* ===//
+    // term -> factor ( ('+' | '-') factor )*
     ASTNode parseTerm() {
         ASTNode left = parseFactor();
-        while (!isAtEnd() && match(TypeOfVar::_operator) &&
-               (currentToken().name == "+" || currentToken().name == "-")) {
+        while (!isAtEnd() && match(TypeOfVar::_operator)
+               && (currentToken().name == "+" || currentToken().name == "-"))
+        {
             Token op = advance();
             ASTNode right = parseFactor();
             ASTNode binOp(ASTNodeType::BinaryOp, op.name);
@@ -538,11 +653,12 @@ private:
         return left;
     }
 
-    //=== parseFactor -> parseUnary ( ('*'|'/') parseUnary )* ===//
+    // factor -> unary ( ('*' | '/') unary )*
     ASTNode parseFactor() {
         ASTNode left = parseUnary();
-        while (!isAtEnd() && match(TypeOfVar::_operator) &&
-               (currentToken().name == "*" || currentToken().name == "/")) {
+        while (!isAtEnd() && match(TypeOfVar::_operator)
+               && (currentToken().name == "*" || currentToken().name == "/"))
+        {
             Token op = advance();
             ASTNode right = parseUnary();
             ASTNode binOp(ASTNodeType::BinaryOp, op.name);
@@ -553,10 +669,12 @@ private:
         return left;
     }
 
-    //=== parseUnary -> (('!'|'-') parseUnary) | parsePrimary ===//
+
+    // unary -> ( '!' | '-' ) unary | primary
     ASTNode parseUnary() {
-        if (!isAtEnd() && match(TypeOfVar::_operator) &&
-            (currentToken().name == "!" || currentToken().name == "-")) {
+        if (!isAtEnd() && match(TypeOfVar::_operator)
+            && (currentToken().name == "!" || currentToken().name == "-"))
+        {
             Token op = advance();
             ASTNode right = parseUnary();
             ASTNode unOp(ASTNodeType::BinaryOp, op.name);
@@ -566,7 +684,10 @@ private:
         return parsePrimary();
     }
 
-    //=== parsePrimary -> '(' assignmentExpr ')' | number | bool | string | identifier(...) [...]* ===//
+
+    // primary -> '(' assignmentExpr ')'
+    //          | number | bool | string
+    //          | identifier ( '('args' ) )? ( '[' expr ']' )*
     ASTNode parsePrimary() {
         if (match(TypeOfVar::_separator, "(")) {
             advance(); // '('
@@ -577,53 +698,52 @@ private:
             advance(); // ')'
             return sub;
         }
-        // number
+
         if (match(TypeOfVar::_number)) {
             Token numTok = advance();
             return ASTNode(ASTNodeType::Literal, numTok.name);
         }
-        // boolean
         if (match(TypeOfVar::_boolean)) {
             Token boolTok = advance();
             return ASTNode(ASTNodeType::Literal, boolTok.name);
         }
-        // string
         if (match(TypeOfVar::_string)) {
             Token strTok = advance();
             return ASTNode(ASTNodeType::Literal, strTok.name);
         }
-        // identifier
+
         if (match(TypeOfVar::_identifier)) {
             Token idTok = advance();
             ASTNode baseNode(ASTNodeType::Identifier, idTok.name);
 
-            // Проверим, не идёт ли '(' => вызов функции
             if (match(TypeOfVar::_separator, "(")) {
                 baseNode = parseFunctionCall(baseNode);
             }
-            // Проверим, не идёт ли '[' => индекс
+
             while (match(TypeOfVar::_separator, "[")) {
                 baseNode = parseIndexAccess(baseNode);
             }
+
             return baseNode;
         }
+
         throw std::runtime_error("Expected primary expression, got: " + currentToken().name);
     }
 
-    //=== parseFunctionCall(baseIdent) -> '(' (assignmentExpr (',' assignmentExpr)*)? ')' ===//
+
+    // parseFunctionCall( baseIdent ) -> '(' (assignmentExpr (',' assignmentExpr)*)? ')'
     ASTNode parseFunctionCall(ASTNode baseIdent) {
         advance(); // '('
-
         ASTNode callNode(ASTNodeType::BinaryOp, "call");
         callNode.addChild(baseIdent);
 
         if (!match(TypeOfVar::_separator, ")")) {
-            // значит есть аргумент(ы)
+            // значит есть аргумент
             ASTNode arg = parseAssignmentExpr();
             callNode.addChild(arg);
 
             while (match(TypeOfVar::_separator, ",")) {
-                advance();
+                advance(); // ','
                 ASTNode nextArg = parseAssignmentExpr();
                 callNode.addChild(nextArg);
             }
@@ -637,7 +757,7 @@ private:
         return callNode;
     }
 
-    //=== parseIndexAccess(base) -> '[' assignmentExpr ']' ===//
+    // parseIndexAccess( base ) -> '[' assignmentExpr ']'
     ASTNode parseIndexAccess(ASTNode base) {
         advance(); // '['
         ASTNode idx = parseAssignmentExpr();

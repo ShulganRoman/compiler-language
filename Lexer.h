@@ -292,7 +292,7 @@ private:
         // иначе идентификатор
         return Token(value, TypeOfVar::_identifier, std::nullopt, startLine, startCol);
     }
-    
+
     char peek() const {
         if (position >= text.size()) return '\0';
         return text[position];
@@ -320,7 +320,6 @@ private:
     }
 
     Token makeToken(const std::string &name, TypeOfVar type) {
-        // line/col могут быть «конечными» токенами
         return Token(name, type, std::nullopt, line, col - (int)name.size());
     }
 };
