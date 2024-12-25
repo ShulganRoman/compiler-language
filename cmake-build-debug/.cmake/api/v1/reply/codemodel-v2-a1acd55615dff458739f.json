@@ -39,7 +39,7 @@
 				{
 					"directoryIndex" : 0,
 					"id" : "compiler_language::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-compiler_language-Debug-167942441d4525986aa6.json",
+					"jsonFile" : "target-compiler_language-Debug-6c954b70e927043e59cb.json",
 					"name" : "compiler_language",
 					"projectIndex" : 0
 				}
@@ -55,6 +55,6 @@
 	"version" : 
 	{
 		"major" : 2,
-		"minor" : 6
+		"minor" : 7
 	}
 }

@@ -15,7 +15,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "CMAKE_ADDR2LINE-NOTFOUND"
+			"value" : "/opt/homebrew/opt/llvm/bin/llvm-addr2line"
 		},
 		{
 			"name" : "CMAKE_AR",
@@ -31,7 +31,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "/Library/Developer/CommandLineTools/usr/bin/ar"
+			"value" : "/usr/bin/ar"
 		},
 		{
 			"name" : "CMAKE_BUILD_TYPE",
@@ -79,7 +79,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "28"
+			"value" : "30"
 		},
 		{
 			"name" : "CMAKE_CACHE_PATCH_VERSION",
@@ -91,7 +91,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "1"
+			"value" : "5"
 		},
 		{
 			"name" : "CMAKE_COLOR_DIAGNOSTICS",
@@ -151,11 +151,59 @@
 				},
 				{
 					"name" : "HELPSTRING",
-					"value" : "CXX compiler"
+					"value" : "No help, variable specified on the command line."
+				}
+			],
+			"type" : "UNINITIALIZED",
+			"value" : "/opt/homebrew/opt/llvm/bin/clang++"
+		},
+		{
+			"name" : "CMAKE_CXX_COMPILER_AR",
+			"properties" : 
+			[
+				{
+					"name" : "ADVANCED",
+					"value" : "1"
+				},
+				{
+					"name" : "HELPSTRING",
+					"value" : "LLVM archiver"
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "/Library/Developer/CommandLineTools/usr/bin/c++"
+			"value" : "/opt/homebrew/Cellar/llvm/19.1.6/bin/llvm-ar"
+		},
+		{
+			"name" : "CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS",
+			"properties" : 
+			[
+				{
+					"name" : "ADVANCED",
+					"value" : "1"
+				},
+				{
+					"name" : "HELPSTRING",
+					"value" : "`clang-scan-deps` dependency scanner"
+				}
+			],
+			"type" : "FILEPATH",
+			"value" : "/opt/homebrew/Cellar/llvm/19.1.6/bin/clang-scan-deps"
+		},
+		{
+			"name" : "CMAKE_CXX_COMPILER_RANLIB",
+			"properties" : 
+			[
+				{
+					"name" : "ADVANCED",
+					"value" : "1"
+				},
+				{
+					"name" : "HELPSTRING",
+					"value" : "Generate index for LLVM archive"
+				}
+			],
+			"type" : "FILEPATH",
+			"value" : "/opt/homebrew/Cellar/llvm/19.1.6/bin/llvm-ranlib"
 		},
 		{
 			"name" : "CMAKE_CXX_FLAGS",
@@ -247,11 +295,59 @@
 				},
 				{
 					"name" : "HELPSTRING",
-					"value" : "C compiler"
+					"value" : "No help, variable specified on the command line."
+				}
+			],
+			"type" : "UNINITIALIZED",
+			"value" : "/opt/homebrew/opt/llvm/bin/clang"
+		},
+		{
+			"name" : "CMAKE_C_COMPILER_AR",
+			"properties" : 
+			[
+				{
+					"name" : "ADVANCED",
+					"value" : "1"
+				},
+				{
+					"name" : "HELPSTRING",
+					"value" : "LLVM archiver"
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "/Library/Developer/CommandLineTools/usr/bin/cc"
+			"value" : "/opt/homebrew/Cellar/llvm/19.1.6/bin/llvm-ar"
+		},
+		{
+			"name" : "CMAKE_C_COMPILER_CLANG_SCAN_DEPS",
+			"properties" : 
+			[
+				{
+					"name" : "ADVANCED",
+					"value" : "1"
+				},
+				{
+					"name" : "HELPSTRING",
+					"value" : "`clang-scan-deps` dependency scanner"
+				}
+			],
+			"type" : "FILEPATH",
+			"value" : "/opt/homebrew/Cellar/llvm/19.1.6/bin/clang-scan-deps"
+		},
+		{
+			"name" : "CMAKE_C_COMPILER_RANLIB",
+			"properties" : 
+			[
+				{
+					"name" : "ADVANCED",
+					"value" : "1"
+				},
+				{
+					"name" : "HELPSTRING",
+					"value" : "Generate index for LLVM archive"
+				}
+			],
+			"type" : "FILEPATH",
+			"value" : "/opt/homebrew/Cellar/llvm/19.1.6/bin/llvm-ranlib"
 		},
 		{
 			"name" : "CMAKE_C_FLAGS",
@@ -347,7 +443,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "CMAKE_DLLTOOL-NOTFOUND"
+			"value" : "/opt/homebrew/opt/llvm/bin/llvm-dlltool"
 		},
 		{
 			"name" : "CMAKE_EXECUTABLE_FORMAT",
@@ -375,7 +471,7 @@
 				}
 			],
 			"type" : "STRING",
-			"value" : ""
+			"value" : "-L/opt/homebrew/opt/llvm/lib"
 		},
 		{
 			"name" : "CMAKE_EXE_LINKER_FLAGS_DEBUG",
@@ -491,7 +587,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "Ninja"
+			"value" : "Unix Makefiles"
 		},
 		{
 			"name" : "CMAKE_GENERATOR_INSTANCE",
@@ -583,19 +679,23 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "/Library/Developer/CommandLineTools/usr/bin/ld"
+			"value" : "/usr/bin/ld"
 		},
 		{
 			"name" : "CMAKE_MAKE_PROGRAM",
 			"properties" : 
 			[
 				{
+					"name" : "ADVANCED",
+					"value" : "1"
+				},
+				{
 					"name" : "HELPSTRING",
-					"value" : "No help, variable specified on the command line."
+					"value" : "Path to a program."
 				}
 			],
-			"type" : "UNINITIALIZED",
-			"value" : "/Users/romansulgan/Applications/CLion.app/Contents/bin/ninja/mac/aarch64/ninja"
+			"type" : "FILEPATH",
+			"value" : "/usr/bin/make"
 		},
 		{
 			"name" : "CMAKE_MODULE_LINKER_FLAGS",
@@ -611,7 +711,7 @@
 				}
 			],
 			"type" : "STRING",
-			"value" : ""
+			"value" : "-L/opt/homebrew/opt/llvm/lib"
 		},
 		{
 			"name" : "CMAKE_MODULE_LINKER_FLAGS_DEBUG",
@@ -691,7 +791,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "/Library/Developer/CommandLineTools/usr/bin/nm"
+			"value" : "/opt/homebrew/opt/llvm/bin/llvm-nm"
 		},
 		{
 			"name" : "CMAKE_NUMBER_OF_MAKEFILES",
@@ -719,7 +819,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "CMAKE_OBJCOPY-NOTFOUND"
+			"value" : "/opt/homebrew/opt/llvm/bin/llvm-objcopy"
 		},
 		{
 			"name" : "CMAKE_OBJDUMP",
@@ -735,7 +835,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "/Library/Developer/CommandLineTools/usr/bin/objdump"
+			"value" : "/opt/homebrew/opt/llvm/bin/llvm-objdump"
 		},
 		{
 			"name" : "CMAKE_OSX_ARCHITECTURES",
@@ -771,7 +871,7 @@
 				}
 			],
 			"type" : "PATH",
-			"value" : "/Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk"
+			"value" : "/Library/Developer/CommandLineTools/SDKs/MacOSX15.1.sdk"
 		},
 		{
 			"name" : "CMAKE_PLATFORM_INFO_INITIALIZED",
@@ -835,7 +935,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "/Library/Developer/CommandLineTools/usr/bin/ranlib"
+			"value" : "/opt/homebrew/opt/llvm/bin/llvm-ranlib"
 		},
 		{
 			"name" : "CMAKE_READELF",
@@ -851,7 +951,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "CMAKE_READELF-NOTFOUND"
+			"value" : "/opt/homebrew/opt/llvm/bin/llvm-readelf"
 		},
 		{
 			"name" : "CMAKE_ROOT",
@@ -863,7 +963,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "/Users/romansulgan/Applications/CLion.app/Contents/bin/cmake/mac/aarch64/share/cmake-3.28"
+			"value" : "/Users/romansulgan/Applications/CLion.app/Contents/bin/cmake/mac/aarch64/share/cmake-3.30"
 		},
 		{
 			"name" : "CMAKE_SHARED_LINKER_FLAGS",
@@ -879,7 +979,7 @@
 				}
 			],
 			"type" : "STRING",
-			"value" : ""
+			"value" : "-L/opt/homebrew/opt/llvm/lib"
 		},
 		{
 			"name" : "CMAKE_SHARED_LINKER_FLAGS_DEBUG",
@@ -1071,7 +1171,7 @@
 				}
 			],
 			"type" : "FILEPATH",
-			"value" : "/Library/Developer/CommandLineTools/usr/bin/strip"
+			"value" : "/usr/bin/strip"
 		},
 		{
 			"name" : "CMAKE_TAPI",
