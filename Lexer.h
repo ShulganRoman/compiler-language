@@ -1,7 +1,3 @@
-//
-// Created by Роман Шульган on 14.12.2024.
-//
-
 #ifndef COMPILER_LANGUAGE_LEXER_H
 #define COMPILER_LANGUAGE_LEXER_H
 
@@ -12,144 +8,321 @@
 #include <cctype>
 #include <set>
 
+
 enum class TypeOfVar {
     _integer,
     _float,
-    _array,
-    _function,
-    _keyword,
-    _operator,
-    _number,
-    _identifier,
-    _separator,
+    _boolean,
+    _string,
+    _keyword,    // "integer", "float", "bool", "string", "if", "else", "while", "for", "return", "void"
+    _operator,   // +, -, *, /, %, =, ==, !=, <, >, <=, >=, &&, ||, ...
+    _number,     // числовые литералы
+    _identifier, // имена переменных, функций, ...
+    _separator,  // ; { } ( ) [ ] , ...
     _unknown
 };
 
+
+inline std::string typeOfVarToString(TypeOfVar t) {
+    switch(t) {
+        case TypeOfVar::_integer:   return "Integer";
+        case TypeOfVar::_float:     return "Float";
+        case TypeOfVar::_boolean:   return "Boolean";
+        case TypeOfVar::_string:    return "String";
+        case TypeOfVar::_keyword:   return "Keyword";
+        case TypeOfVar::_operator:  return "Operator";
+        case TypeOfVar::_number:    return "Number";
+        case TypeOfVar::_identifier:return "Identifier";
+        case TypeOfVar::_separator: return "Separator";
+        case TypeOfVar::_unknown:   return "Unknown";
+    }
+    return "Unknown";
+}
+
 struct Token {
 public:
-    std::string name;
-    TypeOfVar type;
-    std::optional<TypeOfVar> number_type;
+    std::string name;               // сам текст токена
+    TypeOfVar type;                 // тип токена (keyword, operator, ... )
+    std::optional<TypeOfVar> number_type; // если число, может уточнять int/float
+    int line;                       // для отладки
+    int col;                        // для отладки
 
-    explicit Token(std::string name = "none", TypeOfVar type = TypeOfVar::_unknown,
-                   std::optional<TypeOfVar> number_type = std::nullopt)
-            : name(std::move(name)), type(type), number_type(number_type) {}
+    Token(std::string name = "none",
+          TypeOfVar type = TypeOfVar::_unknown,
+          std::optional<TypeOfVar> number_type = std::nullopt,
+          int line = 0,
+          int col  = 0)
+            : name(std::move(name)),
+              type(type),
+              number_type(number_type),
+              line(line),
+              col(col)
+    {}
 };
 
 class Lexer {
 public:
-    std::vector<Token> tokens;
-
-    explicit Lexer(std::string text) : text(std::move(text)) {
-        tokens = parse(this->text);
+    explicit Lexer(std::string text)
+            : text(std::move(text)), position(0), line(1), col(1) {
+        tokens = parse();
     }
 
-    bool is_operator(const std::string &str) {
-        return str == "+" || str == "-" || str == "*" || str == "/" || str == "=" ||
-               str == "==" || str == "!=" || str == "<" || str == "<=" || str == ">" || str == ">=";
-    }
-
-    bool is_separator(char c) {
-        return c == ';' || c == '{' || c == '}' || c == '(' || c == ')' || c == '[' || c == ']';
-    }
-
-    std::optional<TypeOfVar> get_number_type(const std::string &str) {
-        bool has_dot = false;
-        for (char c : str) {
-            if (!isdigit(c) && c != '.') return std::nullopt;
-            if (c == '.') {
-                if (has_dot) return std::nullopt;
-                has_dot = true;
-            }
-        }
-        return has_dot ? TypeOfVar::_float : TypeOfVar::_integer;
-    }
-
-    std::vector<Token> parse(std::string &str) {
-        std::vector<Token> resultOfParse;
-        strip(str);
-        std::vector<std::string> words = split_tokens(str);
-
-        const std::set<std::string> keywords = {"integer", "float", "if", "else", "while", "for", "return"};
-
-        for (size_t i = 0; i < words.size(); i++) {
-            if (keywords.count(words[i])) {
-                resultOfParse.emplace_back(words[i], TypeOfVar::_keyword);
-            } else if (is_operator(words[i])) {
-                resultOfParse.emplace_back(words[i], TypeOfVar::_operator);
-            } else if (words[i] == "[" && i > 0 && resultOfParse.back().type == TypeOfVar::_identifier) {
-                resultOfParse.back().type = TypeOfVar::_array;
-                resultOfParse.emplace_back(words[i], TypeOfVar::_separator);
-            } else if (words[i] == "(" && i > 0 && resultOfParse.back().type == TypeOfVar::_identifier) {
-                resultOfParse.back().type = TypeOfVar::_function;
-                resultOfParse.emplace_back(words[i], TypeOfVar::_separator);
-            } else if (auto number_type = get_number_type(words[i])) {
-                resultOfParse.emplace_back(words[i], TypeOfVar::_number, *number_type);
-            } else if (is_valid_identifier(words[i])) {
-                resultOfParse.emplace_back(words[i], TypeOfVar::_identifier);
-            } else if (words[i].length() == 1 && is_separator(words[i][0])) {
-                resultOfParse.emplace_back(words[i], TypeOfVar::_separator);
-            } else {
-                resultOfParse.emplace_back(words[i], TypeOfVar::_unknown);
-            }
-        }
-
-        return resultOfParse;
-    }
-
+    std::vector<Token> getTokens() const { return tokens; }
 
     ~Lexer() = default;
 
 private:
+    // Исходный текст
     std::string text;
+    // Текущая позиция (индекс) в строке
+    size_t position;
+    // Номер текущей строки/столбца (для отладки)
+    int line;
+    int col;
 
-    std::vector<std::string> split_tokens(const std::string &str) {
-        std::vector<std::string> tokens;
-        std::string current;
-        for (char c : str) {
-            if (isspace(c)) {
-                if (!current.empty()) {
-                    tokens.push_back(current);
-                    current.clear();
-                }
-            } else if (is_separator(c)) {
-                if (!current.empty()) {
-                    tokens.push_back(current);
-                    current.clear();
-                }
-                tokens.emplace_back(1, c);
-            } else if (is_operator(std::string(1, c))) {
-                if (!current.empty()) {
-                    tokens.push_back(current);
-                    current.clear();
-                }
-                tokens.emplace_back(1, c);
-            } else {
-                current += c;
+    // Результирующие токены
+    std::vector<Token> tokens;
+
+    // Ключевые слова — добавим `void`
+    std::set<std::string> keywords = {
+            "integer", "float", "bool", "string", "void",
+            "if", "else", "while", "for", "return",
+            "static", "const"
+    };
+
+    // Набор булевых значений
+    std::set<std::string> boolean_values = {
+            "true", "false"
+    };
+
+    // Многосимвольные операторы
+    std::vector<std::string> multiCharOps = {
+            "==", "!=", "<=", ">=", "&&", "||", "+=", "-=", "*=", "/="
+    };
+
+    // Односимвольные операторы
+    std::set<char> singleCharOps = {
+            '+', '-', '*', '/', '%', '=', '<', '>', '!',
+    };
+
+    // Разделители
+    std::set<char> separators = {
+            ';', '{', '}', '(', ')', '[', ']', ','
+    };
+
+private:
+    std::vector<Token> parse() {
+        std::vector<Token> result;
+
+        while (!isEOF()) {
+            if (std::isspace(peek())) {
+                advance();
+                continue;
+            }
+
+            // Строковый литерал
+            if (peek() == '"') {
+                result.push_back(parseString());
+                continue;
+            }
+
+            // Комментарий // ...
+            if (peek() == '/' && lookAhead(1) == '/') {
+                skipLineComment();
+                continue;
+            }
+            // Комментарий /* ... */
+            if (peek() == '/' && lookAhead(1) == '*') {
+                skipBlockComment();
+                continue;
+            }
+
+            // Многосимвольный оператор (==, !=, <=, >=, &&, ||, +=, ...)
+            if (auto maybeOp = parseMultiCharOperator()) {
+                result.push_back(*maybeOp);
+                continue;
+            }
+
+            // Односимвольный оператор (+, -, *, /, =, ...)
+            if (isOperator(peek())) {
+                result.push_back(makeToken(std::string(1, advance()), TypeOfVar::_operator));
+                continue;
+            }
+
+            // Разделитель (; { } ( ) [ ] ,)
+            if (isSeparator(peek())) {
+                char c = advance();
+                result.push_back(makeToken(std::string(1, c), TypeOfVar::_separator));
+                continue;
+            }
+
+            // Число (целое или с точкой)
+            if (std::isdigit(peek()) || (peek() == '.' && std::isdigit(lookAhead(1)))) {
+                result.push_back(parseNumber());
+                continue;
+            }
+
+            // Идентификатор / ключевое слово / boolean
+            if (std::isalpha(peek()) || peek() == '_') {
+                result.push_back(parseIdentifierOrKeyword());
+                continue;
+            }
+
+            // Если ничего не подошло, считаем unknown
+            char unknownChar = advance();
+            result.push_back(makeToken(std::string(1, unknownChar), TypeOfVar::_unknown));
+        }
+
+        return result;
+    }
+
+    Token parseString() {
+        int startLine = line;
+        int startCol  = col;
+
+        // Пропускаем начальную кавычку
+        advance();
+        std::string value;
+        while (!isEOF() && peek() != '"') {
+            value.push_back(advance());
+        }
+        // Пропускаем закрывающую кавычку
+        if (!isEOF()) {
+            advance();
+        }
+
+        return Token("\"" + value + "\"", TypeOfVar::_string, std::nullopt, startLine, startCol);
+    }
+
+    void skipLineComment() {
+        // съедаем '//'
+        advance();
+        advance();
+        while (!isEOF() && peek() != '\n') {
+            advance();
+        }
+    }
+
+    void skipBlockComment() {
+        // съедаем '/*'
+        advance();
+        advance();
+        while (!isEOF()) {
+            if (peek() == '*' && lookAhead(1) == '/') {
+                advance();
+                advance();
+                break;
+            }
+            advance();
+        }
+    }
+
+    std::optional<Token> parseMultiCharOperator() {
+        int startLine = line;
+        int startCol  = col;
+        if (isEOF()) return std::nullopt;
+
+        std::string twoChars(1, peek());
+        if (position + 1 < text.size()) {
+            twoChars.push_back(text[position+1]);
+        }
+
+        for (auto &op : multiCharOps) {
+            if (twoChars == op) {
+                advance();
+                advance();
+                return Token(op, TypeOfVar::_operator, std::nullopt, startLine, startCol);
             }
         }
-        if (!current.empty()) {
-            tokens.push_back(current);
-        }
-        return tokens;
+        return std::nullopt;
     }
 
-    void strip(std::string &str) {
-        str.erase(str.begin(), std::find_if(str.begin(), str.end(), [](unsigned char c) {
-            return !std::isspace(c);
-        }));
-        str.erase(std::find_if(str.rbegin(), str.rend(), [](unsigned char c) {
-            return !std::isspace(c);
-        }).base(), str.end());
+    bool isOperator(char c) const {
+        return (singleCharOps.count(c) > 0);
     }
 
-    bool is_valid_identifier(const std::string &str) {
-        if (str.empty() || !isalpha(str[0])) return false;
-        for (char c : str) {
-            if (!isalnum(c) && c != '_') return false;
+    bool isSeparator(char c) const {
+        return (separators.count(c) > 0);
+    }
+
+    std::string parseSingleCharOperator() {
+        return std::string(1, advance());
+    }
+
+    Token parseNumber() {
+        int startLine = line;
+        int startCol  = col;
+
+        std::string value;
+        bool hasDot = false;
+
+        while (!isEOF() && (std::isdigit(peek()) || peek() == '.')) {
+            if (peek() == '.') {
+                if (hasDot) {
+                    break;
+                }
+                hasDot = true;
+            }
+            value.push_back(advance());
         }
-        return true;
+
+        TypeOfVar subtype = hasDot ? TypeOfVar::_float : TypeOfVar::_integer;
+        return Token(value, TypeOfVar::_number, subtype, startLine, startCol);
+    }
+
+    Token parseIdentifierOrKeyword() {
+        int startLine = line;
+        int startCol  = col;
+
+        std::string value;
+        while (!isEOF() && (std::isalnum(peek()) || peek() == '_')) {
+            value.push_back(advance());
+        }
+
+        // boolean?
+        if (boolean_values.count(value)) {
+            return Token(value, TypeOfVar::_boolean, std::nullopt, startLine, startCol);
+        }
+
+        // keyword?
+        if (keywords.count(value)) {
+            return Token(value, TypeOfVar::_keyword, std::nullopt, startLine, startCol);
+        }
+
+        // иначе идентификатор
+        return Token(value, TypeOfVar::_identifier, std::nullopt, startLine, startCol);
+    }
+    
+    char peek() const {
+        if (position >= text.size()) return '\0';
+        return text[position];
+    }
+
+    char lookAhead(int offset) const {
+        if (position + offset >= text.size()) return '\0';
+        return text[position + offset];
+    }
+
+    char advance() {
+        if (isEOF()) return '\0';
+        char c = text[position++];
+        if (c == '\n') {
+            line++;
+            col = 1;
+        } else {
+            col++;
+        }
+        return c;
+    }
+
+    bool isEOF() const {
+        return position >= text.size();
+    }
+
+    Token makeToken(const std::string &name, TypeOfVar type) {
+        // line/col могут быть «конечными» токенами
+        return Token(name, type, std::nullopt, line, col - (int)name.size());
     }
 };
 
-#endif //COMPILER_LANGUAGE_LEXER_H
+#endif // COMPILER_LANGUAGE_LEXER_H
