@@ -11,4 +11,6 @@ add_executable(compiler_language
         main.cpp
         Lexer.h
         AST.h
+        SemanticAnalyzer.h
+        SymbolTable.h
 )
