@@ -17,7 +17,6 @@ void printAST(const ASTNode &node, int indent=0) {
     }
 }
 
-
 int main() {
     static const int MAX_SIZE = 10000;
     static bool is_prime[MAX_SIZE];
@@ -25,12 +24,12 @@ int main() {
     is_prime[1]=test2;
 
     std::string code = R"(
-integer* eratosthenes_sieve(integer n) {
-    static const integer MAX_SIZE = 10000;
-    static bool is_prime[MAX_SIZE];
-    static integer primes[MAX_SIZE];
-    MAX_SIZE=30203;
-    for (integer i = 0; i <= n; i = i + 1) {
+const integer MAX_SIZE = 10000;
+bool is_prime[MAX_SIZE];
+integer primes[MAX_SIZE];
+
+void eratosthenes_sieve(integer n) {
+     for (integer i = 0; i <= n; i = i + 1) {
         is_prime[i] = true;
     }
 
@@ -53,7 +52,6 @@ integer* eratosthenes_sieve(integer n) {
     }
 
     primes[prime_count] = -1;
-//    return primes;
 }
     )";
 
@@ -97,3 +95,37 @@ integer* eratosthenes_sieve(integer n) {
 
     return 0;
 }
+
+
+//#include "tasksC++/erastiophene.cpp"
+//#include "tasksC++/sort.cpp"
+//#include "tasksC++/factorial.cpp"
+//#include <iostream>
+//
+//int main() {
+//    integer n = 50;
+//    integer* primes = eratosthenes_sieve(n);
+//    std::cout << "Primes up to " << n << ": ";
+//    for (integer i = 0; primes[i] != -1; i++) {
+//        std::cout << primes[i] << " ";
+//    }
+//    std::cout << std::endl;
+//
+//
+//    integer array[] = {7, 3, 8, 1, 9, 5};
+//    integer len = 6;
+//    sort(array, len);
+//    std::cout << "Sorted array: ";
+//    for (integer i = 0; i < len; i++) {
+//        std::cout << array[i] << " ";
+//    }
+//    std::cout << std::endl;
+//
+//
+//    integer num = 5;
+//    integer result = factorial_calc(num);
+//    std::cout << "Factorial of " << num << ": " << result << std::endl;
+//
+//    return 0;
+//}
+

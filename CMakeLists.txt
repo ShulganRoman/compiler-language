@@ -13,4 +13,5 @@ add_executable(compiler_language
         AST.h
         SemanticAnalyzer.h
         SymbolTable.h
+        tasksC++/test.cpp
 )

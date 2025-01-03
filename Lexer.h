@@ -87,7 +87,7 @@ private:
     std::set<std::string> keywords = {
             "integer", "float", "bool", "string", "void",
             "if", "else", "while", "for", "return",
-            "static", "const"
+            "static", "const", "new"
     };
 
     // Набор булевых значений

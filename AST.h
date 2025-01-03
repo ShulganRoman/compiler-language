@@ -745,6 +745,61 @@ private:
 
             return baseNode;
         }
+        // Добавим проверку:
+// primary -> 'new' type(' *')? '[' assignmentExpr ']'
+        if (match(TypeOfVar::_keyword, "new")) {
+            advance(); // съедаем "new"
+
+            // теперь ждём ключевое слово типа (integer/float/bool/и т.п.)
+            if (!isTypeKeyword()) {
+                throw std::runtime_error("Expected type after 'new'");
+            }
+            Token typeKw = advance();  // например, "integer"
+
+            bool isPtr = false;
+            if (match(TypeOfVar::_operator, "*")) {
+                advance();
+                isPtr = true;
+            }
+
+            // теперь обязательно '['
+            if (!match(TypeOfVar::_separator, "[")) {
+                throw std::runtime_error("Expected '[' after 'new <type>'");
+            }
+            advance(); // '['
+
+            // парсим выражение внутри скобок
+            ASTNode sizeExpr = parseAssignmentExpr();
+
+            // и ']'
+            if (!match(TypeOfVar::_separator, "]")) {
+                throw std::runtime_error("Expected ']' after new <type>[expr]");
+            }
+            advance(); // ']'
+
+            // Собираем конечный узел: BinaryOp(value="new")
+
+            // Ребёнок 0 — тип (например, Literal("integer") или "integer*")
+            std::string fullType = typeKw.name;
+            if (isPtr) {
+                fullType += "*";
+            }
+
+            ASTNode newNode(ASTNodeType::BinaryOp, "new");
+
+            ASTNode typeNode(ASTNodeType::Literal, fullType);
+            newNode.addChild(typeNode);
+
+            // Теперь делаем узел BinaryOp(value="arrayDim") как "пакет" для sizeExpr,
+            // чтобы семантика массивов (размерность) была одинаковой, как при статических объявлениях.
+            ASTNode arrDim(ASTNodeType::BinaryOp, "arrayDim");
+            arrDim.addChild(sizeExpr);
+
+            newNode.addChild(arrDim);
+
+            return newNode;
+        }
+
 
         throw std::runtime_error("Expected primary expression, got: " + currentToken().name);
     }

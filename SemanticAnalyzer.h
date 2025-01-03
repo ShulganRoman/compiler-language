@@ -10,6 +10,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <sstream>
+#include <unordered_map>
 
 class SemanticAnalyzer {
 public:
@@ -29,6 +30,10 @@ private:
     SymbolTable symbolTable;
     std::unordered_map<std::string, std::string> typeAliases;
 
+    std::string currentFunctionName;
+    std::string currentFunctionReturnType;
+
+private:
     void addBuiltInSymbols() {
         Symbol nullptrSymbol("nullptr", "void*", false, {});
         if (!symbolTable.addSymbol(nullptrSymbol)) {
@@ -36,51 +41,63 @@ private:
         }
     }
 
-
-    // Функция для разрешения типа с учётом псевдонимов
-    // пока еще костыльно работает, тупо удаляя static/const... и забирая "важную часть", надо будет разобраться
-    std::string resolveType(const std::string &type) const {
-        auto it = typeAliases.find(type);
-        if (it != typeAliases.end()) {
-            return it->second;
-        }
-        return type;
-    }
-
-    // Продолжение верхней
     std::string getBaseType(const std::string &type) const {
-        std::string baseType;
         std::istringstream iss(type);
-        std::string token;
+        std::string token, result;
         while (iss >> token) {
             if (token != "static" && token != "const") {
-                baseType += resolveType(token);
-                baseType += " ";
+                auto it = typeAliases.find(token);
+                if (it != typeAliases.end()) {
+                    token = it->second;
+                }
+                result += token + " ";
             }
         }
-        if (!baseType.empty() && baseType.back() == ' ') {
-            baseType.pop_back();
+        if (!result.empty() && result.back() == ' ') {
+            result.pop_back();
         }
-        return baseType;
+        return result;
     }
 
-    // парсинг узлов дерева
+    bool isTypeCompatible(const std::string &expected, const std::string &actual) const {
+        // Простая проверка на совпадение "базового" типа
+        return getBaseType(expected) == getBaseType(actual);
+    }
+
+    bool endsWith(const std::string &str, const std::string &suffix) {
+        if (str.size() < suffix.size()) return false;
+        return (str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0);
+    }
+
+    std::string inferLiteralType(const std::string &value) {
+        if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
+            return "string";
+        }
+        if (value == "true" || value == "false") {
+            return "bool";
+        }
+        if (value.find('.') != std::string::npos) {
+            return "float";
+        }
+        return "integer";
+    }
+
+private:
     void visitProgram(ASTNode &node) {
         for (auto &child : node.children) {
             if (child.type == ASTNodeType::FunctionDecl) {
                 visitFunctionDecl(child);
-            } else if (child.type == ASTNodeType::VarDecl) {
+            }
+            else if (child.type == ASTNodeType::VarDecl) {
                 visitVarDecl(child);
-            } else {
+            }
+            else {
                 throw std::runtime_error("Unknown top-level declaration");
             }
         }
     }
 
     void visitFunctionDecl(ASTNode &node) {
-        // Первый ребенок - имя функции
-        // Остальные дети - параметры и тело
-
         if (node.children.empty()) {
             throw std::runtime_error("Function declaration missing children");
         }
@@ -89,7 +106,6 @@ private:
         if (funcNameNode.type != ASTNodeType::Identifier) {
             throw std::runtime_error("Function name must be an identifier");
         }
-
         std::string funcName = funcNameNode.value;
         std::string returnType = node.value;
 
@@ -110,101 +126,41 @@ private:
         }
 
         // Вход в область видимости функции
+        auto oldFuncName = currentFunctionName;
+        auto oldReturnType = currentFunctionReturnType;
+        currentFunctionName = funcName;
+        currentFunctionReturnType = returnType;
+
+        // Входим в область видимости
         symbolTable.enterScope();
 
-        // Добавляем параметры в таблицу символов
         for (size_t i = 1; i < node.children.size() - 1; ++i) {
             ASTNode &param = node.children[i];
+            if (param.children.empty()) {
+                throw std::runtime_error("Parameter has no identifier child");
+            }
             ASTNode &paramNameNode = param.children[0];
-            std::string paramName = paramNameNode.value;
-            std::string paramType = param.value;
-
-            Symbol paramSymbol(paramName, paramType);
+            Symbol paramSymbol(paramNameNode.value, param.value);
             if (!symbolTable.addSymbol(paramSymbol)) {
-                throw std::runtime_error("Parameter '" + paramName + "' already declared in function '" + funcName + "'");
+                throw std::runtime_error("Parameter '" + paramNameNode.value
+                                         + "' already declared in function '" + funcName + "'");
             }
         }
 
-        // Посещаем тело функции
         ASTNode &bodyNode = node.children.back();
         visitBlock(bodyNode);
 
-        // Выход из области видимости функции
         symbolTable.exitScope();
+
+        currentFunctionName = oldFuncName;
+        currentFunctionReturnType = oldReturnType;
     }
-
-    void visitVarDecl(ASTNode &node) {
-        if (node.children.empty()) {
-            throw std::runtime_error("Variable declaration missing children");
-        }
-
-        // Первый ребёнок - это Identifier
-        ASTNode &varNameNode = node.children[0];
-        if (varNameNode.type != ASTNodeType::Identifier) {
-            throw std::runtime_error("Variable name must be an identifier");
-        }
-
-        // node.value, например "static bool" или "static const integer"
-        std::string baseType = getBaseType(node.value);
-
-        // Считаем кол-во измерений массива
-        int arrayDimsCount = 0;
-        for (size_t i = 1; i < node.children.size(); ++i) {
-            ASTNode &child = node.children[i];
-            if (child.type == ASTNodeType::BinaryOp && child.value == "arrayDim") {
-                arrayDimsCount++;
-            }
-        }
-
-        // Дописываем [] для каждого измерения
-        // Пример: если arrayDimsCount=1, то baseType -> "bool[]"
-        //         если arrayDimsCount=2, то baseType -> "bool[][]"
-        for (int i = 0; i < arrayDimsCount; i++) {
-            baseType += "[]";
-        }
-
-        Symbol varSymbol(varNameNode.value, baseType);
-        if (!symbolTable.addSymbol(varSymbol)) {
-            throw std::runtime_error("Variable '" + varNameNode.value + "' already declared in current scope");
-        }
-
-        for (size_t i = 1; i < node.children.size(); ++i) {
-            ASTNode &child = node.children[i];
-            if (child.type == ASTNodeType::BinaryOp && child.value == "arrayDim") {
-                // dimExpr — выражение внутри скобок []
-                ASTNode &dimExpr = child.children[0];
-                std::string dimType = inferType(dimExpr);
-                if (dimType != "integer") {
-                    throw std::runtime_error(
-                            "Array dimension must be of type integer, got " + dimType
-                    );
-                }
-            }
-            else if (child.type == ASTNodeType::BinaryOp) {
-                // Это может быть инициализация: is_prime = ...
-                std::string initType = inferType(child);
-                // Проверяем совместимость initType и baseType
-                if (!isTypeCompatible(baseType, initType)) {
-                    throw std::runtime_error(
-                            "Type mismatch in variable initialization: expected " + baseType +
-                            ", got " + initType
-                    );
-                }
-            }
-        }
-    }
-
-
 
     void visitBlock(ASTNode &node) {
-        // Вход в новую область видимости
         symbolTable.enterScope();
-
         for (auto &child : node.children) {
             visitStatement(child);
         }
-
-        // Выход из области видимости
         symbolTable.exitScope();
     }
 
@@ -237,143 +193,211 @@ private:
         }
     }
 
+    void visitVarDecl(ASTNode &node) {
+        // 1) Считываем имя, тип
+        if (node.children.empty()) {
+            throw std::runtime_error("Variable declaration missing children");
+        }
+        ASTNode &varNameNode = node.children[0];
+        if (varNameNode.type != ASTNodeType::Identifier) {
+            throw std::runtime_error("Variable name must be an Identifier");
+        }
+        std::string baseType = getBaseType(node.value);
+
+        // 2) Ищем arrayDims
+        int arrayDimsCount = 0;
+        std::vector<ASTNode*> dimensionExprs;
+        for (size_t i = 1; i < node.children.size(); ++i) {
+            ASTNode &child = node.children[i];
+            if (child.type == ASTNodeType::BinaryOp && child.value == "arrayDim") {
+                arrayDimsCount++;
+                // внутри arrayDim лежит 1 ребёнок: выражение
+                dimensionExprs.push_back(&child.children[0]);
+            }
+        }
+        // Если arrayDimsCount>0 => baseType += "[]"
+        for (int i = 0; i < arrayDimsCount; i++) {
+            baseType += "[]";
+        }
+
+        // 3) Регистрируем переменную
+        Symbol varSymbol(varNameNode.value, baseType);
+        if (!symbolTable.addSymbol(varSymbol)) {
+            throw std::runtime_error("Variable '" + varNameNode.value
+                                     + "' already declared in this scope");
+        }
+
+        // 4) Для каждого arrayDim: проверим dimExpr
+        for (auto *dimExpr : dimensionExprs) {
+            std::string dimType = inferType(*dimExpr);
+
+            // Размер должен быть integer
+            if (getBaseType(dimType) != "integer") {
+                throw std::runtime_error(
+                        "Array dimension must be integer, got " + dimType);
+            }
+
+            if (dimExpr->type == ASTNodeType::Literal) {
+                // compile-time check
+                int val = std::stoi(dimExpr->value);
+                if (val <= 0) {
+                    throw std::runtime_error(
+                            "Array dimension must be > 0, got " + std::to_string(val));
+                }
+            }
+        }
+
+        // 5) Проверяем инициализацию (напр. arr = new int[0])
+        for (size_t i = 1; i < node.children.size(); ++i) {
+            ASTNode &child = node.children[i];
+            if (child.type == ASTNodeType::BinaryOp && child.value != "arrayDim") {
+                // Это значит присваивание
+                std::string initType = inferType(child);
+                if (!isTypeCompatible(baseType, initType)) {
+                    throw std::runtime_error(
+                            "Type mismatch in variable initialization: expected "
+                            + baseType + ", got " + initType);
+                }
+            }
+        }
+    }
+
+
+    // ------------------ if / while / for / return ------------------
     void visitIfStatement(ASTNode &node) {
-        // node.value == "if"
-        // Первые два ребенка: условие и then-блок
-        // Третий ребенок (необязательный): else-блок
-
         if (node.children.size() < 2) {
-            throw std::runtime_error("If statement missing condition or then-block");
+            throw std::runtime_error("If statement missing condition or body");
         }
-
-        ASTNode &cond = node.children[0];
-        std::string condType = inferType(cond);
+        std::string condType = inferType(node.children[0]);
         if (condType != "bool") {
-            throw std::runtime_error("Condition in if statement must be of type bool, got " + condType);
+            throw std::runtime_error("Condition in if must be bool, got " + condType);
         }
-
-        ASTNode &thenBlock = node.children[1];
-        visitBlock(thenBlock);
-
+        visitBlock(node.children[1]);
         if (node.children.size() > 2) {
-            ASTNode &elseBlock = node.children[2];
-            visitBlock(elseBlock);
+            visitBlock(node.children[2]);
         }
     }
 
     void visitWhileStatement(ASTNode &node) {
-        // node.value == "while"
-        // Первые два ребенка: условие и тело цикла
-
         if (node.children.size() < 2) {
-            throw std::runtime_error("While statement missing condition or body");
+            throw std::runtime_error("While missing condition or body");
         }
-
-        ASTNode &cond = node.children[0];
-        std::string condType = inferType(cond);
+        std::string condType = inferType(node.children[0]);
         if (condType != "bool") {
-            throw std::runtime_error("Condition in while statement must be of type bool, got " + condType);
+            throw std::runtime_error("While condition must be bool, got " + condType);
         }
-
-        ASTNode &body = node.children[1];
-        visitBlock(body);
+        visitBlock(node.children[1]);
     }
 
     void visitForStatement(ASTNode &node) {
+        // for(init; cond; step) { body }
         symbolTable.enterScope();
 
-        // 1) init
         ASTNode &init = node.children[0];
-        if (init.type != ASTNodeType::Literal || init.value != "no_init") {
+        if (!(init.type == ASTNodeType::Literal && init.value == "no_init")) {
             visitStatement(init);
         }
 
-        // 2) condition
         ASTNode &cond = node.children[1];
         if (!(cond.type == ASTNodeType::Literal && cond.value == "true")) {
-            std::string condType = inferType(cond);
-            if (condType != "bool") {
-                throw std::runtime_error("Condition in for statement must be bool, got " + condType);
+            std::string ctype = inferType(cond);
+            if (ctype != "bool") {
+                throw std::runtime_error("For condition must be bool, got " + ctype);
             }
         }
 
-        // 3) step
         ASTNode &step = node.children[2];
         if (!(step.type == ASTNodeType::Literal && step.value == "no_step")) {
             visitExpression(step);
         }
-
-        // 4) body
-        ASTNode &body = node.children[3];
-        visitBlock(body);
+        visitBlock(node.children[3]);
 
         symbolTable.exitScope();
     }
 
-    // @TODO надо доделать, пока что тут только заглушка
     void visitReturnStatement(ASTNode &node) {
-
+        // return (expr?) ;
         if (node.children.empty()) {
-
+            // Если функция не void, ошибка
+            if (getBaseType(currentFunctionReturnType) != "void") {
+                throw std::runtime_error(
+                        "Function '" + currentFunctionName
+                        + "' must return a value of type " + currentFunctionReturnType
+                );
+            }
             return;
         }
+        // Иначе есть выражение
+        std::string exprType = inferType(node.children[0]);
+        std::string expected = getBaseType(currentFunctionReturnType);
+        std::string actual   = getBaseType(exprType);
 
-        ASTNode &expr = node.children[0];
-        std::string exprType = inferType(expr);
+        if (expected == "void") {
+            throw std::runtime_error(
+                    "Void function '" + currentFunctionName + "' cannot return a value"
+            );
+        }
+        if (!isTypeCompatible(expected, actual)) {
+            throw std::runtime_error(
+                    "Return type mismatch in function '" + currentFunctionName
+                    + "': expected '" + expected + "', got '" + actual + "'"
+            );
+        }
     }
 
-    // @TODO надо доделать, пока что тут только заглушка
     void visitExpression(ASTNode &node) {
         inferType(node);
     }
 
-    bool endsWith(const std::string &str, const std::string &suffix) {
-        if (str.size() < suffix.size()) return false;
-        return (str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0);
-    }
-
-    // Функция для определения типа выражения
     std::string inferType(ASTNode &node) {
         switch (node.type) {
-            case ASTNodeType::Literal: {
+            case ASTNodeType::Literal:
                 return inferLiteralType(node.value);
-            }
 
             case ASTNodeType::Identifier: {
-                auto symbol = symbolTable.lookup(node.value);
-                if (!symbol.has_value()) {
+                auto sym = symbolTable.lookup(node.value);
+                if (!sym.has_value()) {
                     throw std::runtime_error("Undefined identifier: " + node.value);
                 }
-                // Возвращаем базовый тип: например, "int", "bool[]", и т.п.
-                return getBaseType(symbol->type);
+                return getBaseType(sym->type);
             }
 
-
-            // операторы =, [], +, -, ...
             case ASTNodeType::BinaryOp: {
-                // 3.1) Присваивание '='
+                // 1) Присваивание '='
                 if (node.value == "=") {
-                    // node.children[0] -- левый операнд (переменная, элемент массива, и т.п.)
-                    // node.children[1] -- правый операнд (выражение)
-                    ASTNode &left = node.children[0];
-                    ASTNode &right = node.children[1];
-
-                    std::string leftType = inferType(left);
-                    std::string rightType = inferType(right);
+                    if (node.children.size() != 2) {
+                        throw std::runtime_error("Assignment must have 2 children");
+                    }
+                    std::string leftType = inferType(node.children[0]);
+                    std::string rightType = inferType(node.children[1]);
+                    if (!isTypeCompatible(leftType, rightType)) {
+                        throw std::runtime_error(
+                                "Type mismatch in assignment: cannot assign "
+                                + rightType + " to " + leftType
+                        );
+                    }
+                    node.inferredType = leftType;
+                    return leftType;
+                }
+                else if (node.value == "+=" || node.value == "-=" || node.value == "*=" || node.value == "/=") {
+                    if (node.children.size() != 2) {
+                        throw std::runtime_error("Assignment operator must have 2 children");
+                    }
+                    std::string leftType = inferType(node.children[0]);
+                    std::string rightType = inferType(node.children[1]);
 
                     if (!isTypeCompatible(leftType, rightType)) {
                         throw std::runtime_error(
-                                "Type mismatch in assignment: cannot assign " + rightType + " to " + leftType
+                                "Type mismatch in assignment operation '" + node.value + "': " +
+                                leftType + " vs " + rightType
                         );
                     }
-                    node.inferredType = leftType; // результат выражения '=' обычно тот же, что и у левого операнда
+                    // Тип результата совпадает с левым операндом (например, i += 1 всё ещё integer)
+                    node.inferredType = leftType;
                     return leftType;
                 }
-
-                // ----------------- 3.2) Вызов функции 'call' -----------------
+                // 2) call
                 if (node.value == "call") {
-                    // node.children[0] -- Identifier(имя_функции)
-                    // node.children[1..N] -- аргументы
                     ASTNode &funcNode = node.children[0];
                     if (funcNode.type != ASTNodeType::Identifier) {
                         throw std::runtime_error("Function call must be an identifier");
@@ -388,7 +412,7 @@ private:
                         throw std::runtime_error(funcName + " is not a function");
                     }
 
-                    // Проверяем кол-во и типы аргументов
+                    // Проверяем аргументы
                     size_t expectedArgs = symbol->parameterTypes.size();
                     size_t providedArgs = node.children.size() - 1;
                     if (providedArgs != expectedArgs) {
@@ -407,155 +431,159 @@ private:
                             );
                         }
                     }
-                    // Тип результата вызова = тип возврата функции (symbol->type)
+                    // Тип результата вызова = тип, который объявлен у функции
                     std::string returnType = getBaseType(symbol->type);
                     node.inferredType = returnType;
                     return returnType;
                 }
-
-                // 3.3) Индексация массива '[]'
+                // 3) []
+                // Индексация массива '[]'
                 if (node.value == "[]") {
-                    // node.children[0] -- сам массив
-                    // node.children[1] -- индекс
                     std::string arrayType = inferType(node.children[0]);
-
-                    // проверяем, действительно ли arrayType оканчивается на "[]"
                     if (!endsWith(arrayType, "[]")) {
-                        throw std::runtime_error(
-                                "Attempting to index a non-array type: " + arrayType
-                        );
+                        throw std::runtime_error("Attempting to index a non-array type: " + arrayType);
                     }
-
-                    // "bool[]" -> "bool", "bool[][]" -> "bool[]"
+                    // Убираем одну пару []
                     arrayType = arrayType.substr(0, arrayType.size() - 2);
 
-                    // Проверяем, что индекс имеет тип integer
+                    // Проверяем, что индекс — integer
                     std::string indexType = inferType(node.children[1]);
                     if (indexType != "integer") {
                         throw std::runtime_error("Index must be integer, got " + indexType);
                     }
-
                     node.inferredType = arrayType;
                     return arrayType;
                 }
-
-                // 3.4) Все остальные операторы: +, -, *, /, <, >, <=, >=, ==, !=,
-                size_t numChildren = node.children.size();
-                if (numChildren == 1) {
-                    // -------- Унарная операция --------
-                    std::string childType = inferType(node.children[0]);
-
-                    if (node.value == "-") {
-                        // унарный минус -> тип = тип ребёнка
-                        node.inferredType = childType;
-                        return childType;
+                    // 4) new
+                else if (node.value == "new") {
+                    // node.children[0] => Literal("int" или "int*")
+                    // node.children[1] => BinaryOp("arrayDim"), внутри [0]=Literal("23")
+                    if (node.children.size() != 2) {
+                        throw std::runtime_error("Invalid 'new' node: expected 2 children");
                     }
-                    else if (node.value == "!") {
-                        // логическое НЕ -> результат "bool"
-                        if (childType != "bool") {
-                            throw std::runtime_error("Unary '!' applied to non-bool type: " + childType);
-                        }
-                        node.inferredType = "bool";
-                        return "bool";
+                    ASTNode &typeNode = node.children[0];
+                    ASTNode &arrDim = node.children[1];
+                    if (typeNode.type != ASTNodeType::Literal) {
+                        throw std::runtime_error("'new': child[0] must be a Literal (type)");
                     }
-                    else {
-                        throw std::runtime_error("Unknown unary operator: " + node.value);
+                    // Проверим, что arrDim.value == "arrayDim"
+                    if (arrDim.value != "arrayDim") {
+                        throw std::runtime_error("'new': child[1] must be arrayDim node");
                     }
-                }
-                else if (numChildren == 2) {
-                    // -------- Бинарная операция --------
-                    std::string leftType = inferType(node.children[0]);
-                    std::string rightType = inferType(node.children[1]);
-
-                    // Список бинарных операторов
-                    if (node.value == "+" || node.value == "-" || node.value == "*" || node.value == "/") {
-                        // Проверка совместимости
-                        if (!isTypeCompatible(leftType, rightType)) {
+                    // Проверим тип размера
+                    if (arrDim.children.size() != 1) {
+                        throw std::runtime_error("'arrayDim' node must have exactly 1 child");
+                    }
+                    std::string sizeT = inferType(arrDim.children[0]);
+                    if (sizeT != "integer") {
+                        throw std::runtime_error(
+                                "Array size must be integer, got " + sizeT
+                        );
+                    }
+                    // Если хотите запретить 0, можно проверить:
+                    if (arrDim.children[0].type == ASTNodeType::Literal) {
+                        int val = std::stoi(arrDim.children[0].value);
+                        if (val <= 0) {
                             throw std::runtime_error(
-                                    "Type mismatch in binary operation '" + node.value + "': " +
-                                    leftType + " vs " + rightType
+                                    "Array size in 'new' must be > 0, got " + std::to_string(val)
                             );
                         }
-                        // результат = leftType
-                        node.inferredType = leftType;
-                        return leftType;
                     }
-                    else if (node.value == "<" || node.value == ">" ||
-                             node.value == "<=" || node.value == ">=" ||
-                             node.value == "==" || node.value == "!=" ||
-                             node.value == "&&" || node.value == "||") {
-                        // Проверка совместимости
-                        if (!isTypeCompatible(leftType, rightType)) {
-                            throw std::runtime_error(
-                                    "Type mismatch in binary operation '" + node.value + "': " +
-                                    leftType + " vs " + rightType
-                            );
-                        }
-                        // Результат таких операций — bool
-                        node.inferredType = "bool";
-                        return "bool";
+                    std::string base = getBaseType(typeNode.value);
+                    if (!endsWith(base, "*")) {
+                        base += "*";
                     }
-                    else {
-                        throw std::runtime_error("Unknown binary operator: " + node.value);
-                    }
+                    node.inferredType = base;
+                    return base;
                 }
+                    // 5) массивы
+                else if (node.value == "arrayDim") {
+                    if (node.children.size() != 1) {
+                        throw std::runtime_error(
+                                "Invalid 'arrayDim': must have exactly 1 child"
+                        );
+                    }
+                    std::string dimExprType = inferType(node.children[0]);
+                    node.inferredType = "integer";
+                    return "integer";
+                }
+                // 6) Остальные операторы (+, -, *, /, <, >, &&, ||, ==, != ...)
                 else {
-                    throw std::runtime_error(
-                            "Invalid number of children (" + std::to_string(numChildren) +
-                            ") for operator: " + node.value
-                    );
+                    size_t nc = node.children.size();
+                    if (nc == 1) {
+                        // Унарный оператор
+                        if (node.value == "-") {
+                            std::string cT = inferType(node.children[0]);
+                            node.inferredType = cT;
+                            return cT;
+                        } else if (node.value == "!") {
+                            std::string cT = inferType(node.children[0]);
+                            if (cT != "bool") {
+                                throw std::runtime_error("Unary '!' on non-bool type");
+                            }
+                            node.inferredType = "bool";
+                            return "bool";
+                        } else {
+                            throw std::runtime_error("Unknown unary operator: " + node.value);
+                        }
+                    } else if (nc == 2) {
+                        // Бинарные операторы: +, -, *, /, <, >, ...
+                        std::string leftType = inferType(node.children[0]);
+                        std::string rightType = inferType(node.children[1]);
+
+                        // Список бинарных операторов
+                        if (node.value == "+" || node.value == "-" || node.value == "*" || node.value == "/") {
+                            // Проверка совместимости
+                            if (!isTypeCompatible(leftType, rightType)) {
+                                throw std::runtime_error(
+                                        "Type mismatch in binary operation '" + node.value + "': " +
+                                        leftType + " vs " + rightType
+                                );
+                            }
+                            // результат = leftType
+                            node.inferredType = leftType;
+                            return leftType;
+                        } else if (node.value == "<" || node.value == ">" ||
+                                   node.value == "<=" || node.value == ">=" ||
+                                   node.value == "==" || node.value == "!=" ||
+                                   node.value == "&&" || node.value == "||") {
+                            // Проверка совместимости
+                            if (!isTypeCompatible(leftType, rightType)) {
+                                throw std::runtime_error(
+                                        "Type mismatch in binary operation '" + node.value + "': " +
+                                        leftType + " vs " + rightType
+                                );
+                            }
+                            // Результат таких операций — bool
+                            node.inferredType = "bool";
+                            return "bool";
+                        } else {
+                            throw std::runtime_error("Unknown binary operator: " + node.value);
+                        }
+                    } else {
+                        throw std::runtime_error(
+                                "Invalid number of children (" + std::to_string(nc) +
+                                ") for operator: " + node.value
+                        );
+                    }
                 }
             }
 
-
-                // 4) Параметр, Объявление функции, Объявление переменной, Блок, Программа
+            // 4) Параметр, Объявление функции, Объявление переменной, Блок, Программа
             case ASTNodeType::Parameter:
-                // node.value типа "integer" или "bool", но может быть "static const integer"
-                return getBaseType(node.value);
-
             case ASTNodeType::FunctionDecl:
-                // Тип функции для выражения в большинстве языков не нужен
-                return "";
-
             case ASTNodeType::VarDecl:
-                // node.value = "bool", "int", "static const integer", ...
-                return getBaseType(node.value);
-
             case ASTNodeType::Block:
-                return "";
-
             case ASTNodeType::Program:
                 return "";
 
             default:
                 throw std::runtime_error(
-                        "Unknown AST node type for type inference: " + astNodeTypeToString(node.type)
+                        "Unknown AST node type for type inference: "
+                        + astNodeTypeToString(node.type)
                 );
         }
     }
-
-
-    // Определение типа строкового литерала
-    std::string inferLiteralType(const std::string &value) {
-        if (value.front() == '"' && value.back() == '"') {
-            return "string";
-        }
-        if (value == "true" || value == "false") {
-            return "bool";
-        }
-        if (value.find('.') != std::string::npos) {
-            return "float";
-        }
-        return "integer";
-    }
-
-    // Проверка совместимости типов
-    bool isTypeCompatible(const std::string &expected, const std::string &actual) const {
-        std::string baseExpected = getBaseType(expected);
-        std::string baseActual = getBaseType(actual);
-        return baseExpected == baseActual;
-    }
-
-
 };
+
 #endif //COMPILER_LANGUAGE_SEMANTICANALYZER_H

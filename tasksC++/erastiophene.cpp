@@ -1,8 +1,8 @@
 typedef int integer;
 
 integer* eratosthenes_sieve(integer n) {
-    static const integer MAX_SIZE = 10000;
-    static bool is_prime[MAX_SIZE];
+    const integer MAX_SIZE = 10000;
+    bool is_prime[MAX_SIZE];
     static integer primes[MAX_SIZE];
 
     for (integer i = 0; i <= n; i = i + 1) {
