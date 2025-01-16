@@ -1,15 +1,28 @@
-////
-//// Created by Тихонов Александр on 03.01.2025.
-////
-//
-//#include "erastiophene.cpp"
+//#include <stdio.h>
 //#include "sort.cpp"
 //#include "factorial.cpp"
+//#include "erastiophene.cpp"
 //
-//int main(){
-//    eratosthenes_sieve(45);
-//    int* array = new int[]{1,3,41,6,26,3};
-//    sort(array, 6);
-//    factorial_calc(45);
+//int main() {
+//    integer len = 6;
+//    global_array[0] = 5;
+//    global_array[1] = 3;
+//    global_array[2] = 8;
+//    global_array[3] = 1;
+//    global_array[4] = 2;
+//    global_array[5] = 9;
+//
+//    printf("before sort:\n");
+//    for (integer i = 0; i < len; i = i + 1) {
+//        printf("%d ", global_array[i]);
+//    }
+//
+//    sort(len);
+//
+//    printf("\nafter sort:\n");
+//    for (integer i = 0; i < len; i = i + 1) {
+//        printf("%d ", global_array[i]);
+//    }
+//
 //    return 0;
 //}

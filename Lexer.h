@@ -47,7 +47,7 @@ public:
     int line;                       // для отладки
     int col;                        // для отладки
 
-    Token(std::string name = "none",
+    explicit Token(std::string name = "none",
           TypeOfVar type = TypeOfVar::_unknown,
           std::optional<TypeOfVar> number_type = std::nullopt,
           int line = 0,
@@ -67,7 +67,7 @@ public:
         tokens = parse();
     }
 
-    std::vector<Token> getTokens() const { return tokens; }
+    [[nodiscard]] std::vector<Token> getTokens() const { return tokens; }
 
     ~Lexer() = default;
 
@@ -76,14 +76,14 @@ private:
     std::string text;
     // Текущая позиция (индекс) в строке
     size_t position;
-    // Номер текущей строки/столбца (для отладки)
+    // Номер текущей строки/столбца
     int line;
     int col;
 
     // Результирующие токены
     std::vector<Token> tokens;
 
-    // Ключевые слова — добавим `void`
+    // Ключевые слова
     std::set<std::string> keywords = {
             "integer", "float", "bool", "string", "void",
             "if", "else", "while", "for", "return",
@@ -243,10 +243,6 @@ private:
 
     bool isSeparator(char c) const {
         return (separators.count(c) > 0);
-    }
-
-    std::string parseSingleCharOperator() {
-        return std::string(1, advance());
     }
 
     Token parseNumber() {

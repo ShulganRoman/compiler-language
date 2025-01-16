@@ -81,14 +81,14 @@ private:
     std::vector<Token> tokens;
     size_t position;
 
-    Token currentToken() const {
+    [[nodiscard]] Token currentToken() const {
         if (position < tokens.size()) {
             return tokens[position];
         }
         return Token("EOF", TypeOfVar::_unknown, std::nullopt, -1, -1);
     }
 
-    bool isAtEnd() const {
+    [[nodiscard]] bool isAtEnd() const {
         return position >= tokens.size();
     }
 
@@ -276,7 +276,7 @@ private:
             throw std::runtime_error("Expected ';' after var_decl");
         }
         advance(); // ';'
-
+        std::cout << "parseVarDecl found varName='" << ident.name << "', type='" << typeKw.name << "', isArray=" << "..." << "\n";
         return varDecl;
     }
 

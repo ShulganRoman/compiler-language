@@ -3,14 +3,17 @@
 
 typedef int integer;
 
-void sort(integer* sp, integer len) {
-    for (integer i = 1; i < len; i=i+1) {
-        integer key = sp[i];
+const integer MAX_SIZE = 10000;
+integer global_array[MAX_SIZE];
+
+void sort(integer len) {
+    for (integer i = 1; i < len; i = i + 1) {
+        integer key = global_array[i];
         integer j = i - 1;
-        while (j >= 0 && sp[j] > key) {
-            sp[j + 1] = sp[j];
-            j=j-1;
+        while (j >= 0 && global_array[j] > key) {
+            global_array[j + 1] = global_array[j];
+            j = j - 1;
         }
-        sp[j + 1] = key;
+        global_array[j + 1] = key;
     }
 }

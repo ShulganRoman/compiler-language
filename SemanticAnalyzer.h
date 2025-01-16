@@ -25,6 +25,10 @@ public:
         visitProgram(root);
     }
 
+    SymbolTable& getSymbolTable(){
+        return symbolTable;
+    }
+
 private:
     ASTNode &root;
     SymbolTable symbolTable;
@@ -59,9 +63,41 @@ private:
         return result;
     }
 
-    bool isTypeCompatible(const std::string &expected, const std::string &actual) const {
-        // Простая проверка на совпадение "базового" типа
-        return getBaseType(expected) == getBaseType(actual);
+    bool isTypeCompatible(const std::string &expected, const std::string &actual) const
+    {
+        std::string eBase = getBaseType(expected);
+        std::string aBase = getBaseType(actual);
+
+        if (eBase == aBase) {
+            return true;
+        }
+
+        auto stripArray = [](const std::string &t) {
+            if (t.size() >= 2 && t.compare(t.size() - 2, 2, "[]") == 0) {
+                return t.substr(0, t.size() - 2);  // отрезаем "[]"
+            }
+            return t;
+        };
+
+        auto stripPtr = [](const std::string &t) {
+            if (!t.empty() && t.back() == '*') {
+                return t.substr(0, t.size() - 1);  // отрезаем '*'
+            }
+            return t;
+        };
+
+        // expected = "integer[]", actual = "integer*"
+        if (stripArray(eBase) == stripPtr(aBase)) {
+            return true;
+        }
+
+        // expected = "integer*", actual = "integer[]"
+        if (stripPtr(eBase) == stripArray(aBase)) {
+            return true;
+        }
+
+        // Если ничего не совпало — возвращаем false
+        return false;
     }
 
     bool endsWith(const std::string &str, const std::string &suffix) {
@@ -316,7 +352,7 @@ private:
     }
 
     void visitReturnStatement(ASTNode &node) {
-        // return (expr?) ;
+        // return (expr?)
         if (node.children.empty()) {
             // Если функция не void, ошибка
             if (getBaseType(currentFunctionReturnType) != "void") {
@@ -392,7 +428,7 @@ private:
                                 leftType + " vs " + rightType
                         );
                     }
-                    // Тип результата совпадает с левым операндом (например, i += 1 всё ещё integer)
+                    // Тип результата совпадает с левым операндом
                     node.inferredType = leftType;
                     return leftType;
                 }
@@ -480,7 +516,6 @@ private:
                                 "Array size must be integer, got " + sizeT
                         );
                     }
-                    // Если хотите запретить 0, можно проверить:
                     if (arrDim.children[0].type == ASTNodeType::Literal) {
                         int val = std::stoi(arrDim.children[0].value);
                         if (val <= 0) {

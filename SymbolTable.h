@@ -20,33 +20,29 @@ public:
 class SymbolTable {
 public:
     SymbolTable() {
-        enterScope(); // Вход в глобальную область видимости
+        enterScope();
     }
 
-    // Вход в новую область видимости
     void enterScope() {
         scopes.emplace_back();
     }
 
-    // Выход из текущей области видимости
     void exitScope() {
         if (!scopes.empty()) {
             scopes.pop_back();
         }
     }
 
-    // Добавление символа в текущую область видимости
     bool addSymbol(const Symbol &symbol) {
         if (scopes.empty()) return false;
         auto &currentScope = scopes.back();
         if (currentScope.find(symbol.name) != currentScope.end()) {
-            return false; // Символ уже существует в текущей области
+            return false;
         }
         currentScope.emplace(symbol.name, symbol);
         return true;
     }
 
-    // Поиск символа в таблице (от текущей области до глобальной)
     std::optional<Symbol> lookup(const std::string &name) const {
         for (auto it = scopes.rbegin(); it != scopes.rend(); ++it) {
             const auto &scope = *it;

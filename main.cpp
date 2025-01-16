@@ -2,6 +2,8 @@
 #include "Lexer.h"
 #include "AST.h"
 #include "SemanticAnalyzer.h"
+#include "CodeGenerator.h"
+#include <llvm/Support/raw_ostream.h>
 
 void printAST(const ASTNode &node, int indent=0) {
     std::string prefix(indent, ' ');
@@ -29,7 +31,7 @@ bool is_prime[MAX_SIZE];
 integer primes[MAX_SIZE];
 
 void eratosthenes_sieve(integer n) {
-     for (integer i = 0; i <= n; i = i + 1) {
+    for (integer i = 0; i <= n; i = i + 1) {
         is_prime[i] = true;
     }
 
@@ -51,7 +53,7 @@ void eratosthenes_sieve(integer n) {
         }
     }
 
-    primes[prime_count] = -1;
+    primes[prime_count] = 1-2;
 }
     )";
 
@@ -59,7 +61,7 @@ void eratosthenes_sieve(integer n) {
     Lexer lexer(code);
     auto tokens = lexer.getTokens();
 
-    // 2. Посмотрим, что за токены он выдаёт
+    // 2. Вывод токенов
     std::cout << "=== TOKENS ===\n";
     for (auto &t : tokens) {
         std::cout << "[" << t.name << "] "
@@ -84,8 +86,8 @@ void eratosthenes_sieve(integer n) {
     }
 
     // 5. Семантический анализ
+    SemanticAnalyzer analyzer(root);
     try {
-        SemanticAnalyzer analyzer(root);
         analyzer.analyze();
         std::cout << "\n=== Semantic Analysis Passed ===\n";
     } catch (const std::exception &ex) {
@@ -93,39 +95,16 @@ void eratosthenes_sieve(integer n) {
         return 1;
     }
 
+    // 6. Генерация кода с помощью LLVM
+    try {
+        CodeGenerator codeGen(analyzer.getSymbolTable());
+        std::unique_ptr<llvm::Module> module = codeGen.generate(root);
+        std::cout << "\n=== Generated LLVM IR ===\n";
+        module->print(llvm::outs(), nullptr);
+    } catch (const std::exception &ex) {
+        std::cerr << "Code generation error: " << ex.what() << std::endl;
+        return 1;
+    }
+
     return 0;
 }
-
-
-//#include "tasksC++/erastiophene.cpp"
-//#include "tasksC++/sort.cpp"
-//#include "tasksC++/factorial.cpp"
-//#include <iostream>
-//
-//int main() {
-//    integer n = 50;
-//    integer* primes = eratosthenes_sieve(n);
-//    std::cout << "Primes up to " << n << ": ";
-//    for (integer i = 0; primes[i] != -1; i++) {
-//        std::cout << primes[i] << " ";
-//    }
-//    std::cout << std::endl;
-//
-//
-//    integer array[] = {7, 3, 8, 1, 9, 5};
-//    integer len = 6;
-//    sort(array, len);
-//    std::cout << "Sorted array: ";
-//    for (integer i = 0; i < len; i++) {
-//        std::cout << array[i] << " ";
-//    }
-//    std::cout << std::endl;
-//
-//
-//    integer num = 5;
-//    integer result = factorial_calc(num);
-//    std::cout << "Factorial of " << num << ": " << result << std::endl;
-//
-//    return 0;
-//}
-
