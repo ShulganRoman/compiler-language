@@ -22,13 +22,18 @@ llvm_map_components_to_libnames(llvm_libs
 # Добавить исполняемый файл и исходные файлы проекта
 add_executable(compiler_language
         main.cpp
-        Lexer.h
-        AST.h
-        SemanticAnalyzer.h
-        SymbolTable.h
+        Lexer/Lexer.h
+        Parser_AST/AST.h
+        SemanticAnalyzer/SemanticAnalyzer.h
+        SemanticAnalyzer/SymbolTable.h
         tasksC++/test.cpp
-        CodeGenerator.h
-        CodeGenerator.cpp
+        LLVM/CodeGenerator.h
+        LLVM/CodeGenerator.cpp
+        Interpreter/InstructionMy.h
+        Interpreter/BytecodeGenerator.h
+        Interpreter/BytecodeProgramMy.h
+        VM.h
+        Interpreter/InterpreterSymbolTable.h
 )
 
 # Связать проект с библиотеками LLVM

@@ -1,8 +1,10 @@
 #include <iostream>
-#include "Lexer.h"
-#include "AST.h"
-#include "SemanticAnalyzer.h"
-#include "CodeGenerator.h"
+#include "Lexer/Lexer.h"
+#include "Parser_AST/AST.h"
+#include "SemanticAnalyzer/SemanticAnalyzer.h"
+#include "LLVM/CodeGenerator.h"
+#include "Interpreter/InstructionMy.h"
+#include "Interpreter/BytecodeGenerator.h"
 #include <llvm/Support/raw_ostream.h>
 
 void printAST(const ASTNode &node, int indent=0) {
@@ -26,36 +28,14 @@ int main() {
     is_prime[1]=test2;
 
     std::string code = R"(
-const integer MAX_SIZE = 10000;
-bool is_prime[MAX_SIZE];
-integer primes[MAX_SIZE];
-
-void eratosthenes_sieve(integer n) {
-    for (integer i = 0; i <= n; i = i + 1) {
-        is_prime[i] = true;
-    }
-
-    is_prime[0] = is_prime[1] = false;
-
-    for (integer i = 2; i * i <= n; i = i + 1) {
-        if (is_prime[i]) {
-            for (integer j = i * i; j <= n; j = j + i) {
-                is_prime[j] = false;
-            }
-        }
-    }
-
-    integer prime_count = 0;
-    for (integer i = 2; i <= n; i = i + 1) {
-        if (is_prime[i]) {
-            primes[prime_count] = i;
-            prime_count = prime_count + 1;
-        }
-    }
-
-    primes[prime_count] = 1-2;
+integer MAX_SIZE = 5;
+integer global_array[MAX_SIZE+1];
+void foo(){
+    global_array[1] = 4;
+    integer a = global_array[1];
 }
-    )";
+)";
+
 
     // 1. Лексер
     Lexer lexer(code);
@@ -102,7 +82,27 @@ void eratosthenes_sieve(integer n) {
         std::cout << "\n=== Generated LLVM IR ===\n";
         module->print(llvm::outs(), nullptr);
     } catch (const std::exception &ex) {
-        std::cerr << "Code generation error: " << ex.what() << std::endl;
+        std::cerr << "LLVM generation error: " << ex.what() << std::endl;
+    }
+
+
+    // 7. Генерация собственным интерпретатором
+    try {
+        MyBytecodeGenerator generator;
+        BytecodeProgramMy program = generator.generate(root);
+        std::cout << "\n=== BYTECODE PROGRAM ===\n";
+
+        for (const auto &fn: program.functions) {
+            std::cout << "Function " << fn.name << ":\n";
+            for (size_t i = 0; i < fn.instructions.size(); i++) {
+                const auto &ins = fn.instructions[i];
+                std::cout << "  " << i << ": " << opcodeToString(ins.opcode)
+                          << " int=" << ins.operandInt
+                          << " str='" << ins.operandStr << "'\n";
+            }
+        }
+    } catch (const std::exception &ex){
+        std::cerr << "Bytecode programm error: " << ex.what() << std::endl;
         return 1;
     }
 
