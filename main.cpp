@@ -27,15 +27,23 @@ int main() {
     bool test2 = false;
     is_prime[1]=test2;
 
+
     std::string code = R"(
 integer MAX_SIZE = 5;
-integer global_array[MAX_SIZE+1];
-void foo(){
-    global_array[1] = 4;
-    integer a = global_array[1];
+integer global_array[MAX_SIZE];
+
+void sort(integer len) {
+    for (integer i = 1; i < len; i = i + 1) {
+        integer key = global_array[i];
+        integer j = i - 1;
+        while (j >= 0 && global_array[j] > key) {
+            global_array[j + 1] = global_array[j];
+            j = j - 1;
+        }
+        global_array[j + 1] = key;
+    }
 }
 )";
-
 
     // 1. Лексер
     Lexer lexer(code);

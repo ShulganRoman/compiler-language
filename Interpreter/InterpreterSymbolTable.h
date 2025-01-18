@@ -29,21 +29,21 @@ public:
     std::string name;
     VarType type;
     bool isConstant;
-    int value; // Только для констант
+    int ConstantValue; // Только для констант
     int arraySize; // Только для массивов, -1 если не массив
 
     // Конструктор для обычной переменной
     Variable(VarType type, const std::string &name)
-            : type(type), name(name), isConstant(false), value(0), arraySize(-1) {}
+            : type(type), name(name), isConstant(false), ConstantValue(0), arraySize(-1) {}
 
     // Конструктор для массива
     Variable(VarType type, const std::string &name, VarType varType, int arraySize)
-            : type(type), name(name), isConstant(false), value(0), arraySize(arraySize) {}
+            : type(type), name(name), isConstant(false), ConstantValue(0), arraySize(arraySize) {}
 
     // Метод для установки переменной как константы
     void setConstant(int val) {
         isConstant = true;
-        value = val;
+        ConstantValue = val;
     }
 };
 
@@ -92,7 +92,7 @@ public:
         if (it != symbols.end()) {
             const Variable &var = variables[it->second];
             if (var.isConstant) {
-                val = var.value;
+                val = var.ConstantValue;
                 return true;
             }
         }

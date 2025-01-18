@@ -94,17 +94,18 @@
 //        else {
 //            // Обработка простой переменной
 //            Variable var(varType, varName);
-//            program.globalSymbolTable.addVariable(var);
+//            int varIndex = program.globalSymbolTable.addVariable(var); // Добавляем переменную и получаем её индекс
 //
 //            if (varNode.children.size() > 1) {
 //                // Инициализация переменной
 //                ASTNode initExpr = varNode.children[1];
 //                int initVal = evaluateConstantExpression(initExpr, program.globalSymbolTable);
-//                var.setConstant(initVal);
-//                program.globalSymbolTable.addVariable(var); // Обновляем с флагом константы
+//
+//                // Обновляем существующую переменную как константу
+//                program.globalSymbolTable.variables[varIndex].setConstant(initVal);
 //
 //                // Генерируем инструкции для инициализации
-//                generateExpression(initExpr, mainFn);
+//                generateExpression(initExpr, program.globalSymbolTable, mainFn);
 //                mainFn.instructions.emplace_back(OpCode::STORE_GLOBAL, varName);
 //            }
 //            else {
@@ -159,7 +160,7 @@
 //        if (funcNode.children[i].type != ASTNodeType::Block) {
 //            throw std::runtime_error("FunctionDecl: expected Block as last child");
 //        }
-//        generateBlock(funcNode.children[i], fn);
+//        generateBlock(funcNode.children[i], program.globalSymbolTable, fn);
 //
 //        // В конце функции, если нет RET, добавим
 //        if (fn.instructions.empty()
@@ -185,42 +186,42 @@
 //    // ------------------------------------------------------------
 //    // 3) Обработка блоков и операторов
 //    // ------------------------------------------------------------
-//    void generateBlock(const ASTNode &blockNode, BytecodeFunctionMy &fn) {
+//    void generateBlock(const ASTNode &blockNode, InterpreterSymbolTable &globalSymbolTable, BytecodeFunctionMy &fn) {
 //        if (blockNode.type != ASTNodeType::Block) {
 //            throw std::runtime_error("generateBlock: node is not Block");
 //        }
 //        // blockNode.children — это набор statement'ов
 //        for (auto &stmt : blockNode.children) {
-//            generateStatement(stmt, fn);
+//            generateStatement(stmt, globalSymbolTable, fn);
 //        }
 //    }
 //
-//    void generateStatement(const ASTNode &stmt, BytecodeFunctionMy &fn) {
+//    void generateStatement(const ASTNode &stmt, InterpreterSymbolTable &globalSymbolTable, BytecodeFunctionMy &fn) {
 //        switch (stmt.type) {
 //            case ASTNodeType::VarDecl:
-//                generateLocalVarDecl(stmt, fn);
+//                generateLocalVarDecl(stmt, globalSymbolTable, fn);
 //                break;
 //            case ASTNodeType::ReturnStmt:
-//                generateReturnStmt(stmt, fn);
+//                generateReturnStmt(stmt, globalSymbolTable, fn);
 //                break;
 //            case ASTNodeType::IfStmt:
-//                generateIfStmt(stmt, fn);
+//                generateIfStmt(stmt, globalSymbolTable, fn);
 //                break;
 //            case ASTNodeType::WhileStmt:
-//                generateWhileStmt(stmt, fn);
+//                generateWhileStmt(stmt, globalSymbolTable, fn);
 //                break;
 //            case ASTNodeType::ForStmt:
-//                generateForStmt(stmt, fn);
+//                generateForStmt(stmt, globalSymbolTable, fn);
 //                break;
 //            case ASTNodeType::Assignment:
-//                generateAssignment(stmt, fn);
+//                generateAssignment(stmt, globalSymbolTable, fn);
 //                break;
 //            case ASTNodeType::Expression:
 //            case ASTNodeType::BinaryOp:
 //            case ASTNodeType::Identifier:
 //            case ASTNodeType::Literal:
 //                // Это может быть Expression-Statement, например "a + 1;"
-//                generateExpression(stmt, fn);
+//                generateExpression(stmt, globalSymbolTable, fn);
 //                // При необходимости можно добавить POP
 //                break;
 //            default:
@@ -233,11 +234,12 @@
 //    // ------------------------------------------------------------
 //    // 4) Локальные переменные
 //    // ------------------------------------------------------------
-//    void generateLocalVarDecl(const ASTNode &varNode, BytecodeFunctionMy &fn) {
-//        // Пример: "integer a = 4;"
-//        // varNode.value = "integer" (или "const integer" и т.п.)
-//        // varNode.children[0] = Identifier("a")
-//        // varNode.children[1..] = возможно инициализация, arrayDim, ...
+//    void generateLocalVarDecl(const ASTNode &varNode, InterpreterSymbolTable &globalSymbolTable, BytecodeFunctionMy &fn) {
+//        // Пример: "integer key = global_array[1];"
+//        // varNode.value = "integer"
+//        // varNode.children[0] = Identifier("key")
+//        // varNode.children[1] = BinaryOp("[]")
+//
 //        if (varNode.children.empty()) {
 //            throw std::runtime_error("Local VarDecl has no children");
 //        }
@@ -250,9 +252,9 @@
 //        if (varNode.children.size() > 1 &&
 //            varNode.children[1].type == ASTNodeType::BinaryOp &&
 //            varNode.children[1].value == "arrayDim") {
-//            // Массив
+//            // Обработка массива (аналогично глобальным переменным)
 //            ASTNode sizeExpr = varNode.children[1].children[0];
-//            int arraySize = evaluateConstantExpression(sizeExpr, fn.symbolTable);
+//            int arraySize = evaluateConstantExpression(sizeExpr, globalSymbolTable);
 //
 //            // Создаём переменную массива
 //            Variable var(varType, varName, varType, arraySize);
@@ -274,13 +276,9 @@
 //            if (varNode.children.size() > 1) {
 //                // Инициализация переменной
 //                ASTNode initExpr = varNode.children[1];
-//                int initVal = evaluateConstantExpression(initExpr, fn.symbolTable);
-//                // Предполагается, что переменная может быть константой
-//                // Если язык позволяет, отметьте переменную как константу
-//                // var.setConstant(initVal); // Если необходимо
 //
 //                // Генерируем инструкции для инициализации
-//                generateExpression(initExpr, fn);
+//                generateExpression(initExpr, globalSymbolTable, fn);
 //                fn.instructions.emplace_back(OpCode::STORE_LOCAL, fn.symbolTable.getVariableIndex(varName));
 //            }
 //            else {
@@ -294,10 +292,10 @@
 //    // ------------------------------------------------------------
 //    // 5) RETURN
 //    // ------------------------------------------------------------
-//    void generateReturnStmt(const ASTNode &retNode, BytecodeFunctionMy &fn) {
-//        // retNode.children[0] может быть выражение (если есть)
+//    void generateReturnStmt(const ASTNode &retNode, InterpreterSymbolTable &globalSymbolTable, BytecodeFunctionMy &fn) {
+//        // Если есть выражение в return
 //        if (!retNode.children.empty()) {
-//            generateExpression(retNode.children[0], fn);
+//            generateExpression(retNode.children[0], globalSymbolTable, fn);
 //        }
 //        fn.instructions.emplace_back(OpCode::RET);
 //    }
@@ -305,7 +303,7 @@
 //    // ------------------------------------------------------------
 //    // 6) IF
 //    // ------------------------------------------------------------
-//    void generateIfStmt(const ASTNode &ifNode, BytecodeFunctionMy &fn) {
+//    void generateIfStmt(const ASTNode &ifNode, InterpreterSymbolTable &globalSymbolTable, BytecodeFunctionMy &fn) {
 //        // ifNode.children[0] = cond
 //        // ifNode.children[1] = thenBlock
 //        // ifNode.children[2] = elseBlock (опционально)
@@ -313,14 +311,14 @@
 //            throw std::runtime_error("IfStmt has <2 children (missing cond or thenBlock)");
 //        }
 //        // 1) условие
-//        generateExpression(ifNode.children[0], fn);
+//        generateExpression(ifNode.children[0], globalSymbolTable, fn);
 //
 //        // 2) вставляем JMP_IF_FALSE (пока operandInt = -1)
 //        int jmpIfFalseIndex = (int)fn.instructions.size();
 //        fn.instructions.emplace_back(OpCode::JMP_IF_FALSE, -1);
 //
 //        // 3) thenBlock
-//        generateBlock(ifNode.children[1], fn);
+//        generateBlock(ifNode.children[1], globalSymbolTable, fn);
 //
 //        // 4) вставляем JMP, чтобы перепрыгнуть через else
 //        int jmpIndex = (int)fn.instructions.size();
@@ -331,7 +329,7 @@
 //
 //        // 6) если есть elseBlock
 //        if (ifNode.children.size() > 2) {
-//            generateBlock(ifNode.children[2], fn);
+//            generateBlock(ifNode.children[2], globalSymbolTable, fn);
 //        }
 //
 //        // 7) fixup JMP -> конец if
@@ -341,7 +339,7 @@
 //    // ------------------------------------------------------------
 //    // 7) WHILE
 //    // ------------------------------------------------------------
-//    void generateWhileStmt(const ASTNode &whileNode, BytecodeFunctionMy &fn) {
+//    void generateWhileStmt(const ASTNode &whileNode, InterpreterSymbolTable &globalSymbolTable, BytecodeFunctionMy &fn) {
 //        // whileNode.children[0] = cond
 //        // whileNode.children[1] = body
 //        if (whileNode.children.size() < 2) {
@@ -350,14 +348,14 @@
 //        int loopStart = (int)fn.instructions.size();
 //
 //        // Условие
-//        generateExpression(whileNode.children[0], fn);
+//        generateExpression(whileNode.children[0], globalSymbolTable, fn);
 //
 //        // jmp_if_false => конец цикла
 //        int jmpIfFalseIndex = (int)fn.instructions.size();
 //        fn.instructions.emplace_back(OpCode::JMP_IF_FALSE, -1);
 //
 //        // Тело цикла
-//        generateBlock(whileNode.children[1], fn);
+//        generateBlock(whileNode.children[1], globalSymbolTable, fn);
 //
 //        // Переход назад к началу
 //        fn.instructions.emplace_back(OpCode::JMP, loopStart);
@@ -370,7 +368,7 @@
 //    // ------------------------------------------------------------
 //    // 8) FOR
 //    // ------------------------------------------------------------
-//    void generateForStmt(const ASTNode &forNode, BytecodeFunctionMy &fn) {
+//    void generateForStmt(const ASTNode &forNode, InterpreterSymbolTable &globalSymbolTable, BytecodeFunctionMy &fn) {
 //        // forNode (value="for") имеет 4 children:
 //        //   [0] init
 //        //   [1] cond
@@ -380,24 +378,25 @@
 //        if (forNode.children.size() < 4) {
 //            throw std::runtime_error("ForStmt must have 4 children (init, cond, step, body)");
 //        }
+//
 //        // (1) инициализация
-//        generateStatement(forNode.children[0], fn);
+//        generateStatement(forNode.children[0], globalSymbolTable, fn);
 //
 //        // (2) метка начала цикла
 //        int loopStart = (int)fn.instructions.size();
 //
 //        // (3) условие
-//        generateExpression(forNode.children[1], fn);
+//        generateExpression(forNode.children[1], globalSymbolTable, fn);
 //
 //        // (4) jmp_if_false => конец цикла
 //        int jmpIfFalseIndex = (int)fn.instructions.size();
 //        fn.instructions.emplace_back(OpCode::JMP_IF_FALSE, -1);
 //
 //        // (5) тело цикла
-//        generateBlock(forNode.children[3], fn);
+//        generateBlock(forNode.children[3], globalSymbolTable, fn);
 //
 //        // (6) шаг
-//        generateStatement(forNode.children[2], fn);
+//        generateStatement(forNode.children[2], globalSymbolTable, fn);
 //
 //        // (7) переход назад к началу
 //        fn.instructions.emplace_back(OpCode::JMP, loopStart);
@@ -410,33 +409,55 @@
 //    // ------------------------------------------------------------
 //    // 9) ASSIGNMENT
 //    // ------------------------------------------------------------
-//    void generateAssignment(const ASTNode &assignNode, BytecodeFunctionMy &fn) {
+//    void generateAssignment(const ASTNode &assignNode, InterpreterSymbolTable &globalSymbolTable, BytecodeFunctionMy &fn) {
 //        // assignNode.children[0] = lhs
 //        // assignNode.children[1] = rhs
 //        if (assignNode.children.size() < 2) {
 //            throw std::runtime_error("Assignment node must have 2 children (lhs, rhs)");
 //        }
+//
 //        // Генерим RHS
-//        generateExpression(assignNode.children[1], fn);
+//        generateExpression(assignNode.children[1], globalSymbolTable, fn);
 //
 //        // Определяем LHS
 //        const ASTNode &lhs = assignNode.children[0];
 //        if (lhs.type == ASTNodeType::Identifier) {
 //            std::string varName = lhs.value;
 //
-//            // Проверяем, существует ли переменная
-//            if (!program.globalSymbolTable.hasVariable(varName)) {
+//            bool isGlobal = false;
+//            bool isLocal = false;
+//
+//            // Проверяем, существует ли переменная в глобальной таблице
+//            if (globalSymbolTable.hasVariable(varName)) {
+//                isGlobal = true;
+//            }
+//            // Проверяем, существует ли переменная в локальной таблице функции
+//            if (fn.symbolTable.hasVariable(varName)) {
+//                isLocal = true;
+//            }
+//
+//            if (!isGlobal && !isLocal) {
 //                throw std::runtime_error("Undefined variable: " + varName);
 //            }
 //
 //            // Проверяем, является ли переменная константой
-//            int constVal;
-//            if (program.globalSymbolTable.hasConstant(varName, constVal)) {
-//                throw std::runtime_error("Cannot modify constant variable: " + varName);
+//            if (isGlobal) {
+//                int constVal;
+//                if (globalSymbolTable.hasConstant(varName, constVal)) {
+//                    throw std::runtime_error("Cannot modify constant variable: " + varName);
+//                }
+//                // Присваиваем значение глобальной переменной
+//                fn.instructions.emplace_back(OpCode::STORE_GLOBAL, varName);
 //            }
-//
-//            // Присваиваем значение глобальной переменной
-//            fn.instructions.emplace_back(OpCode::STORE_GLOBAL, varName);
+//            else if (isLocal) {
+//                int constVal;
+//                if (fn.symbolTable.hasConstant(varName, constVal)) {
+//                    throw std::runtime_error("Cannot modify constant variable: " + varName);
+//                }
+//                // Присваиваем значение локальной переменной
+//                int localIndex = fn.symbolTable.getVariableIndex(varName);
+//                fn.instructions.emplace_back(OpCode::STORE_LOCAL, localIndex);
+//            }
 //        }
 //        else if (lhs.type == ASTNodeType::BinaryOp && lhs.value == "[]") {
 //            // Обработка присваивания элементу массива
@@ -445,13 +466,19 @@
 //            }
 //            std::string arrayName = lhs.children[0].value;
 //
-//            // Проверяем, существует ли массив
-//            if (!program.globalSymbolTable.hasVariable(arrayName)) {
+//            // Проверяем, существует ли массив в глобальной таблице
+//            if (!globalSymbolTable.hasVariable(arrayName)) {
 //                throw std::runtime_error("Undefined array: " + arrayName);
 //            }
 //
 //            // Генерируем индекс
-//            generateExpression(lhs.children[1], fn);
+//            generateExpression(lhs.children[1], globalSymbolTable, fn);
+//
+//            // Проверяем, является ли массив константой
+//            int constVal;
+//            if (globalSymbolTable.hasConstant(arrayName, constVal)) {
+//                throw std::runtime_error("Cannot modify constant array: " + arrayName);
+//            }
 //
 //            // Присваиваем значение элементу массива
 //            fn.instructions.emplace_back(OpCode::STORE_ARRAY, arrayName);
@@ -464,18 +491,26 @@
 //    // ------------------------------------------------------------
 //    // 10) Генерация выражений
 //    // ------------------------------------------------------------
-//    void generateExpression(const ASTNode &exprNode, BytecodeFunctionMy &fn) {
+//    void generateLiteral(const ASTNode &literalNode, BytecodeFunctionMy &fn) {
+//        // Поддержка только целых чисел для простоты
+//        // Можно расширить для других типов (float, bool, string и т.д.)
+//        long long val = std::stoll(literalNode.value);
+//        fn.instructions.emplace_back(OpCode::LOAD_CONST, val);
+//    }
+//
+//
+//    void generateExpression(const ASTNode &exprNode, InterpreterSymbolTable &globalSymbolTable, BytecodeFunctionMy &fn) {
 //        switch (exprNode.type) {
 //            case ASTNodeType::Literal:
 //                generateLiteral(exprNode, fn);
 //                break;
 //
 //            case ASTNodeType::Identifier:
-//                generateIdentifier(exprNode, fn);
+//                generateIdentifier(exprNode, globalSymbolTable, fn);
 //                break;
 //
 //            case ASTNodeType::BinaryOp:
-//                generateBinaryOp(exprNode, fn);
+//                generateBinaryOp(exprNode, globalSymbolTable, fn);
 //                break;
 //
 //            default:
@@ -485,17 +520,10 @@
 //        }
 //    }
 //
-//    void generateLiteral(const ASTNode &literalNode, BytecodeFunctionMy &fn) {
-//        // Поддержка только целых чисел для простоты
-//        // Можно расширить для других типов (float, bool, string и т.д.)
-//        long long val = std::stoll(literalNode.value);
-//        fn.instructions.emplace_back(OpCode::LOAD_CONST, val);
-//    }
-//
-//    void generateIdentifier(const ASTNode &idNode, BytecodeFunctionMy &fn) {
+//    void generateIdentifier(const ASTNode &idNode, InterpreterSymbolTable &globalSymbolTable, BytecodeFunctionMy &fn) {
 //        std::string varName = idNode.value;
 //        // Проверяем, глобальная ли переменная
-//        if (program.globalSymbolTable.hasVariable(varName)) {
+//        if (globalSymbolTable.hasVariable(varName)) {
 //            fn.instructions.emplace_back(OpCode::LOAD_GLOBAL, varName);
 //        }
 //        else {
@@ -511,14 +539,14 @@
 //    // ------------------------------------------------------------
 //    // 11) Генерация бинарных операций
 //    // ------------------------------------------------------------
-//    void generateBinaryOp(const ASTNode &binOp, BytecodeFunctionMy &fn) {
+//    void generateBinaryOp(const ASTNode &binOp, InterpreterSymbolTable &globalSymbolTable, BytecodeFunctionMy &fn) {
 //        const std::string &op = binOp.value;
 //
 //        // Обработка присваивания непосредственно здесь
 //        if (op == "=") {
 //            // Логика присваивания: a = b + c
 //            // Генерим RHS (b + c)
-//            generateExpression(binOp.children[1], fn);
+//            generateExpression(binOp.children[1], globalSymbolTable, fn);
 //
 //            // Определяем LHS
 //            const ASTNode &lhs = binOp.children[0];
@@ -526,13 +554,13 @@
 //                std::string varName = lhs.value;
 //
 //                // Проверяем, существует ли переменная
-//                if (!program.globalSymbolTable.hasVariable(varName)) {
+//                if (!globalSymbolTable.hasVariable(varName)) {
 //                    throw std::runtime_error("Undefined variable: " + varName);
 //                }
 //
 //                // Проверяем, является ли переменная константой
 //                int constVal;
-//                if (program.globalSymbolTable.hasConstant(varName, constVal)) {
+//                if (globalSymbolTable.hasConstant(varName, constVal)) {
 //                    throw std::runtime_error("Cannot modify constant variable: " + varName);
 //                }
 //
@@ -547,12 +575,12 @@
 //                std::string arrayName = lhs.children[0].value;
 //
 //                // Проверяем, существует ли массив
-//                if (!program.globalSymbolTable.hasVariable(arrayName)) {
+//                if (!globalSymbolTable.hasVariable(arrayName)) {
 //                    throw std::runtime_error("Undefined array: " + arrayName);
 //                }
 //
 //                // Генерируем индекс
-//                generateExpression(lhs.children[1], fn);
+//                generateExpression(lhs.children[1], globalSymbolTable, fn);
 //
 //                // Присваиваем значение элементу массива
 //                fn.instructions.emplace_back(OpCode::STORE_ARRAY, arrayName);
@@ -565,8 +593,8 @@
 //
 //        // Обычные бинарные операции: +, -, *, /, и т.д.
 //        // Генерим левый и правый операнды
-//        generateExpression(binOp.children[0], fn);
-//        generateExpression(binOp.children[1], fn);
+//        generateExpression(binOp.children[0], globalSymbolTable, fn);
+//        generateExpression(binOp.children[1], globalSymbolTable, fn);
 //
 //        // Генерим соответствующий опкод
 //        if (op == "+") {
@@ -612,7 +640,7 @@
 //            // Доступ к элементу массива: array[i]
 //            // Генерим имя массива и индекс
 //            std::string arrayName = binOp.children[0].value;
-//            generateExpression(binOp.children[1], fn);
+//            generateExpression(binOp.children[1], globalSymbolTable, fn);
 //            fn.instructions.emplace_back(OpCode::LOAD_ARRAY, arrayName);
 //        }
 //        else if (op == "call") {
@@ -630,25 +658,60 @@
 //    // ------------------------------------------------------------
 //    // Дополнительные члены класса
 //    // ------------------------------------------------------------
-//    // Чтобы доступить к глобальной таблице символов
-//    BytecodeProgramMy program;
 //
-//    // Вспомогательная функция для оценки константных выражений
+//    /**
+//     * Вспомогательная функция для оценки константных выражений
+//     */
 //    int evaluateConstantExpression(const ASTNode &exprNode, const InterpreterSymbolTable &symbolTable) const {
-//        if (exprNode.type == ASTNodeType::Literal) {
-//            return std::stoi(exprNode.value);
-//        }
-//        else if (exprNode.type == ASTNodeType::Identifier) {
-//            int val;
-//            if (symbolTable.hasConstant(exprNode.value, val)) {
-//                return val;
-//            }
-//            else {
+//        switch (exprNode.type) {
+//            case ASTNodeType::Literal:
+//                return std::stoi(exprNode.value);
+//
+//            case ASTNodeType::Identifier: {
+//                int val;
+//                if (symbolTable.hasConstant(exprNode.value, val)) {
+//                    return val;
+//                }
 //                throw std::runtime_error("Array size identifier is not a constant: " + exprNode.value);
 //            }
-//        }
-//        else {
-//            throw std::runtime_error("Array size must be a literal or a constant identifier.");
+//
+//            case ASTNodeType::BinaryOp: {
+//                if (exprNode.children.size() != 2) {
+//                    throw std::runtime_error("BinaryOp must have exactly two children.");
+//                }
+//                // Рекурсивно вычисляем левый и правый операнды
+//                int left = evaluateConstantExpression(exprNode.children[0], symbolTable);
+//                int right = evaluateConstantExpression(exprNode.children[1], symbolTable);
+//
+//                // Выполняем операцию в зависимости от оператора
+//                if (exprNode.value == "+") {
+//                    return left + right;
+//                }
+//                else if (exprNode.value == "-") {
+//                    return left - right;
+//                }
+//                else if (exprNode.value == "*") {
+//                    return left * right;
+//                }
+//                else if (exprNode.value == "/") {
+//                    if (right == 0) {
+//                        throw std::runtime_error("Division by zero in constant expression.");
+//                    }
+//                    return left / right;
+//                }
+//                else if (exprNode.value == "%") {
+//                    if (right == 0) {
+//                        throw std::runtime_error("Modulo by zero in constant expression.");
+//                    }
+//                    return left % right;
+//                }
+//                else {
+//                    throw std::runtime_error("Unsupported operator in constant expression: " + exprNode.value);
+//                }
+//            }
+//
+//            default:
+//                throw std::runtime_error("Array size must be a literal, a constant identifier, or a constant expression.");
 //        }
 //    }
 //};
@@ -712,64 +775,6 @@ private:
     // ------------------------------------------------------------
     // 1) Глобальные переменные
     // ------------------------------------------------------------
-//    void generateGlobalVarDecl(const ASTNode &varNode, BytecodeProgramMy &program, BytecodeFunctionMy &mainFn) {
-//        // varNode.value = "integer" или "bool" и т.п.
-//        // varNode.children[0] = Identifier(...)
-//        // varNode.children[1..] = инициализация или массив, и т.д.
-//        if (varNode.children.empty()) {
-//            throw std::runtime_error("VarDecl node has no children (missing identifier?).");
-//        }
-//        std::string varName = varNode.children[0].value;
-//        std::cout << "Global VarDecl: " << varNode.value << " " << varName << std::endl;
-//
-//        if (varName.empty()) {
-//            throw std::runtime_error("Variable name is empty.");
-//        }
-//
-//        VarType varType = parseVarType(varNode.value);
-//
-//        // Проверяем, массив ли это
-//        if (varNode.children.size() > 1 &&
-//            varNode.children[1].type == ASTNodeType::BinaryOp &&
-//            varNode.children[1].value == "arrayDim") {
-//            // Обработка массива
-//            ASTNode sizeExpr = varNode.children[1].children[0];
-//            int arraySize = evaluateConstantExpression(sizeExpr, program.globalSymbolTable);
-//
-//            // Создаём переменную массива
-//            Variable var(varType, varName, varType, arraySize);
-//            program.globalSymbolTable.addVariable(var);
-//
-//            // Инициализируем массив нулями
-//            for(int i = 0; i < arraySize; ++i) {
-//                mainFn.instructions.emplace_back(OpCode::LOAD_CONST, 0);
-//                mainFn.instructions.emplace_back(OpCode::STORE_ARRAY, varName);
-//            }
-//        }
-//        else {
-//            // Обработка простой переменной
-//            Variable var(varType, varName);
-//            int varIndex = program.globalSymbolTable.addVariable(var); // Добавляем переменную и получаем её индекс
-//
-//            if (varNode.children.size() > 1) {
-//                // Инициализация переменной
-//                ASTNode initExpr = varNode.children[1];
-//                int initVal = evaluateConstantExpression(initExpr, program.globalSymbolTable);
-//
-//                // Обновляем существующую переменную как константу
-//                program.globalSymbolTable.variables[varIndex].setConstant(initVal);
-//
-//                // Генерируем инструкции для инициализации
-//                generateExpression(initExpr, program.globalSymbolTable, mainFn);
-//                mainFn.instructions.emplace_back(OpCode::STORE_GLOBAL, varName);
-//            }
-//            else {
-//                // Без инициализации — устанавливаем 0
-//                mainFn.instructions.emplace_back(OpCode::LOAD_CONST, 0);
-//                mainFn.instructions.emplace_back(OpCode::STORE_GLOBAL, varName);
-//            }
-//        }
-//    }
     void generateGlobalVarDecl(const ASTNode &varNode, BytecodeProgramMy &program, BytecodeFunctionMy &mainFn) {
         // varNode.value = "integer" или "bool" и т.п.
         // varNode.children[0] = Identifier(...)
@@ -815,7 +820,8 @@ private:
                 int initVal = evaluateConstantExpression(initExpr, program.globalSymbolTable);
 
                 // Обновляем существующую переменную как константу
-                program.globalSymbolTable.variables[varIndex].setConstant(initVal);
+                program.globalSymbolTable.variables[varIndex].isConstant = true;
+                program.globalSymbolTable.variables[varIndex].ConstantValue = initVal;
 
                 // Генерируем инструкции для инициализации
                 generateExpression(initExpr, program.globalSymbolTable, mainFn);
@@ -947,63 +953,6 @@ private:
     // ------------------------------------------------------------
     // 4) Локальные переменные
     // ------------------------------------------------------------
-
-//    void generateLocalVarDecl(const ASTNode &varNode, InterpreterSymbolTable &globalSymbolTable, BytecodeFunctionMy &fn) {
-//        // Пример: "integer a = 4;"
-//        // varNode.value = "integer" (или "const integer" и т.п.)
-//        // varNode.children[0] = Identifier("a")
-//        // varNode.children[1..] = возможно инициализация, arrayDim, ...
-//        if (varNode.children.empty()) {
-//            throw std::runtime_error("Local VarDecl has no children");
-//        }
-//        std::string varName = varNode.children[0].value;
-//
-//        // Определение типа
-//        VarType varType = parseVarType(varNode.value);
-//
-//        // Проверяем, массив ли это
-//        if (varNode.children.size() > 1 &&
-//            varNode.children[1].type == ASTNodeType::BinaryOp &&
-//            varNode.children[1].value == "arrayDim") {
-//            // Массив
-//            ASTNode sizeExpr = varNode.children[1].children[0];
-//            int arraySize = evaluateConstantExpression(sizeExpr, globalSymbolTable);
-//
-//            // Создаём переменную массива
-//            Variable var(varType, varName, varType, arraySize);
-//            fn.symbolTable.addVariable(var);
-//
-//            // Инициализируем массив нулями
-//            for(int i = 0; i < arraySize; ++i) {
-//                fn.instructions.emplace_back(OpCode::LOAD_CONST, 0);
-//                fn.instructions.emplace_back(OpCode::STORE_ARRAY, varName);
-//            }
-//        }
-//        else {
-//            // Простая переменная
-//            Variable var(varType, varName);
-//            fn.symbolTable.addVariable(var);
-//
-//            std::cout << "[local var] " << varNode.value << " " << varName << "\n";
-//
-//            if (varNode.children.size() > 1) {
-//                // Инициализация переменной
-//                ASTNode initExpr = varNode.children[1];
-//                int initVal = evaluateConstantExpression(initExpr, globalSymbolTable);
-//                // Если ваша система поддерживает константы для локальных переменных, отметьте их как константы
-//                // var.setConstant(initVal); // Если необходимо
-//
-//                // Генерируем инструкции для инициализации
-//                generateExpression(initExpr, globalSymbolTable, fn);
-//                fn.instructions.emplace_back(OpCode::STORE_LOCAL, fn.symbolTable.getVariableIndex(varName));
-//            }
-//            else {
-//                // Без инициализации — устанавливаем 0
-//                fn.instructions.emplace_back(OpCode::LOAD_CONST, 0);
-//                fn.instructions.emplace_back(OpCode::STORE_LOCAL, fn.symbolTable.getVariableIndex(varName));
-//            }
-//        }
-//    }
     void generateLocalVarDecl(const ASTNode &varNode, InterpreterSymbolTable &globalSymbolTable, BytecodeFunctionMy &fn) {
         // Пример: "integer key = global_array[1];"
         // varNode.value = "integer"
@@ -1029,6 +978,8 @@ private:
             // Создаём переменную массива
             Variable var(varType, varName, varType, arraySize);
             fn.symbolTable.addVariable(var);
+            int varIndex = fn.symbolTable.getVariableIndex(varName);
+            std::cout << "Added local array variable: " << varName << " (Size: " << arraySize << ") at index " << varIndex << std::endl;
 
             // Инициализируем массив нулями
             for(int i = 0; i < arraySize; ++i) {
@@ -1039,9 +990,8 @@ private:
         else {
             // Простая переменная
             Variable var(varType, varName);
-            fn.symbolTable.addVariable(var);
-
-            std::cout << "[local var] " << varNode.value << " " << varName << "\n";
+            int varIndex = fn.symbolTable.addVariable(var);
+            std::cout << "Added local variable: " << varName << " (Index: " << varIndex << ")" << std::endl;
 
             if (varNode.children.size() > 1) {
                 // Инициализация переменной
@@ -1049,12 +999,14 @@ private:
 
                 // Генерируем инструкции для инициализации
                 generateExpression(initExpr, globalSymbolTable, fn);
-                fn.instructions.emplace_back(OpCode::STORE_LOCAL, fn.symbolTable.getVariableIndex(varName));
+                fn.instructions.emplace_back(OpCode::STORE_LOCAL, varIndex);
+                std::cout << "Initialized local variable: " << varName << std::endl;
             }
             else {
                 // Без инициализации — устанавливаем 0
                 fn.instructions.emplace_back(OpCode::LOAD_CONST, 0);
-                fn.instructions.emplace_back(OpCode::STORE_LOCAL, fn.symbolTable.getVariableIndex(varName));
+                fn.instructions.emplace_back(OpCode::STORE_LOCAL, varIndex);
+                std::cout << "Initialized local variable to 0: " << varName << std::endl;
             }
         }
     }
@@ -1095,7 +1047,7 @@ private:
         fn.instructions.emplace_back(OpCode::JMP, -1);
 
         // 5) fixup JMP_IF_FALSE -> начало else
-        fn.instructions[jmpIfFalseIndex].operandInt = (int64_t)fn.instructions.size();
+        fn.instructions[jmpIfFalseIndex].operandInt = (int)fn.instructions.size();
 
         // 6) если есть elseBlock
         if (ifNode.children.size() > 2) {
@@ -1103,7 +1055,7 @@ private:
         }
 
         // 7) fixup JMP -> конец if
-        fn.instructions[jmpIndex].operandInt = (int64_t)fn.instructions.size();
+        fn.instructions[jmpIndex].operandInt = (int)fn.instructions.size();
     }
 
     // ------------------------------------------------------------
@@ -1148,6 +1100,7 @@ private:
         if (forNode.children.size() < 4) {
             throw std::runtime_error("ForStmt must have 4 children (init, cond, step, body)");
         }
+
         // (1) инициализация
         generateStatement(forNode.children[0], globalSymbolTable, fn);
 
@@ -1184,6 +1137,7 @@ private:
         if (assignNode.children.size() < 2) {
             throw std::runtime_error("Assignment node must have 2 children (lhs, rhs)");
         }
+
         // Генерим RHS
         generateExpression(assignNode.children[1], globalSymbolTable, fn);
 
@@ -1192,19 +1146,36 @@ private:
         if (lhs.type == ASTNodeType::Identifier) {
             std::string varName = lhs.value;
 
-            // Проверяем, существует ли переменная
-            if (!globalSymbolTable.hasVariable(varName)) {
+            bool isGlobal = globalSymbolTable.hasVariable(varName);
+            bool isLocal = fn.symbolTable.hasVariable(varName);
+
+            std::cout << "Assignment to variable: " << varName
+                      << ", isGlobal: " << isGlobal
+                      << ", isLocal: " << isLocal << std::endl;
+
+            if (!isGlobal && !isLocal) {
                 throw std::runtime_error("Undefined variable: " + varName);
             }
 
-            // Проверяем, является ли переменная константой
-            int constVal;
-            if (globalSymbolTable.hasConstant(varName, constVal)) {
-                throw std::runtime_error("Cannot modify constant variable: " + varName);
+            if (isGlobal) {
+                int constVal;
+                if (globalSymbolTable.hasConstant(varName, constVal)) {
+                    throw std::runtime_error("Cannot modify constant variable: " + varName);
+                }
+                // Присваиваем значение глобальной переменной
+                fn.instructions.emplace_back(OpCode::STORE_GLOBAL, varName);
+                std::cout << "Assigned to global variable: " << varName << std::endl;
             }
-
-            // Присваиваем значение глобальной переменной
-            fn.instructions.emplace_back(OpCode::STORE_GLOBAL, varName);
+            else if (isLocal) {
+                int constVal;
+                if (fn.symbolTable.hasConstant(varName, constVal)) {
+                    throw std::runtime_error("Cannot modify constant variable: " + varName);
+                }
+                // Присваиваем значение локальной переменной
+                int localIndex = fn.symbolTable.getVariableIndex(varName);
+                std::cout << "Assigned to local variable: " << varName << " (Index: " << localIndex << ")" << std::endl;
+                fn.instructions.emplace_back(OpCode::STORE_LOCAL, localIndex);
+            }
         }
         else if (lhs.type == ASTNodeType::BinaryOp && lhs.value == "[]") {
             // Обработка присваивания элементу массива
@@ -1213,7 +1184,7 @@ private:
             }
             std::string arrayName = lhs.children[0].value;
 
-            // Проверяем, существует ли массив
+            // Проверяем, существует ли массив в глобальной таблице
             if (!globalSymbolTable.hasVariable(arrayName)) {
                 throw std::runtime_error("Undefined array: " + arrayName);
             }
@@ -1221,8 +1192,15 @@ private:
             // Генерируем индекс
             generateExpression(lhs.children[1], globalSymbolTable, fn);
 
+            // Проверяем, является ли массив константой
+            int constVal;
+            if (globalSymbolTable.hasConstant(arrayName, constVal)) {
+                throw std::runtime_error("Cannot modify constant array: " + arrayName);
+            }
+
             // Присваиваем значение элементу массива
             fn.instructions.emplace_back(OpCode::STORE_ARRAY, arrayName);
+            std::cout << "Assigned to array: " << arrayName << std::endl;
         }
         else {
             throw std::runtime_error("Assignment to complex LHS not implemented.");
@@ -1232,6 +1210,14 @@ private:
     // ------------------------------------------------------------
     // 10) Генерация выражений
     // ------------------------------------------------------------
+    void generateLiteral(const ASTNode &literalNode, BytecodeFunctionMy &fn) {
+        // Поддержка только целых чисел для простоты
+        // Можно расширить для других типов (float, bool, string и т.д.)
+        long long val = std::stoll(literalNode.value);
+        fn.instructions.emplace_back(OpCode::LOAD_CONST, val);
+        std::cout << "Generated LOAD_CONST " << val << std::endl;
+    }
+
     void generateExpression(const ASTNode &exprNode, InterpreterSymbolTable &globalSymbolTable, BytecodeFunctionMy &fn) {
         switch (exprNode.type) {
             case ASTNodeType::Literal:
@@ -1253,18 +1239,12 @@ private:
         }
     }
 
-    void generateLiteral(const ASTNode &literalNode, BytecodeFunctionMy &fn) {
-        // Поддержка только целых чисел для простоты
-        // Можно расширить для других типов (float, bool, string и т.д.)
-        long long val = std::stoll(literalNode.value);
-        fn.instructions.emplace_back(OpCode::LOAD_CONST, val);
-    }
-
     void generateIdentifier(const ASTNode &idNode, InterpreterSymbolTable &globalSymbolTable, BytecodeFunctionMy &fn) {
         std::string varName = idNode.value;
         // Проверяем, глобальная ли переменная
         if (globalSymbolTable.hasVariable(varName)) {
             fn.instructions.emplace_back(OpCode::LOAD_GLOBAL, varName);
+            std::cout << "Generated LOAD_GLOBAL " << varName << std::endl;
         }
         else {
             // Локальная переменная
@@ -1273,6 +1253,7 @@ private:
                 throw std::runtime_error("Undefined variable: " + varName);
             }
             fn.instructions.emplace_back(OpCode::LOAD_LOCAL, localIndex);
+            std::cout << "Generated LOAD_LOCAL " << varName << " (Index: " << localIndex << ")" << std::endl;
         }
     }
 
@@ -1293,19 +1274,36 @@ private:
             if (lhs.type == ASTNodeType::Identifier) {
                 std::string varName = lhs.value;
 
-                // Проверяем, существует ли переменная
-                if (!globalSymbolTable.hasVariable(varName)) {
+                bool isGlobal = globalSymbolTable.hasVariable(varName);
+                bool isLocal = fn.symbolTable.hasVariable(varName);
+
+                std::cout << "Assignment to variable: " << varName
+                          << ", isGlobal: " << isGlobal
+                          << ", isLocal: " << isLocal << std::endl;
+
+                if (!isGlobal && !isLocal) {
                     throw std::runtime_error("Undefined variable: " + varName);
                 }
 
-                // Проверяем, является ли переменная константой
-                int constVal;
-                if (globalSymbolTable.hasConstant(varName, constVal)) {
-                    throw std::runtime_error("Cannot modify constant variable: " + varName);
+                if (isGlobal) {
+                    int constVal;
+                    if (globalSymbolTable.hasConstant(varName, constVal)) {
+                        throw std::runtime_error("Cannot modify constant variable: " + varName);
+                    }
+                    // Присваиваем значение глобальной переменной
+                    fn.instructions.emplace_back(OpCode::STORE_GLOBAL, varName);
+                    std::cout << "Assigned to global variable: " << varName << std::endl;
                 }
-
-                // Присваиваем значение глобальной переменной
-                fn.instructions.emplace_back(OpCode::STORE_GLOBAL, varName);
+                else if (isLocal) {
+                    int constVal;
+                    if (fn.symbolTable.hasConstant(varName, constVal)) {
+                        throw std::runtime_error("Cannot modify constant variable: " + varName);
+                    }
+                    // Присваиваем значение локальной переменной
+                    int localIndex = fn.symbolTable.getVariableIndex(varName);
+                    std::cout << "Assigned to local variable: " << varName << " (Index: " << localIndex << ")" << std::endl;
+                    fn.instructions.emplace_back(OpCode::STORE_LOCAL, localIndex);
+                }
             }
             else if (lhs.type == ASTNodeType::BinaryOp && lhs.value == "[]") {
                 // Присваивание элементу массива: array[i] = value
@@ -1314,7 +1312,7 @@ private:
                 }
                 std::string arrayName = lhs.children[0].value;
 
-                // Проверяем, существует ли массив
+                // Проверяем, существует ли массив в глобальной таблице
                 if (!globalSymbolTable.hasVariable(arrayName)) {
                     throw std::runtime_error("Undefined array: " + arrayName);
                 }
@@ -1322,8 +1320,15 @@ private:
                 // Генерируем индекс
                 generateExpression(lhs.children[1], globalSymbolTable, fn);
 
+                // Проверяем, является ли массив константой
+                int constVal;
+                if (globalSymbolTable.hasConstant(arrayName, constVal)) {
+                    throw std::runtime_error("Cannot modify constant array: " + arrayName);
+                }
+
                 // Присваиваем значение элементу массива
                 fn.instructions.emplace_back(OpCode::STORE_ARRAY, arrayName);
+                std::cout << "Assigned to array: " << arrayName << std::endl;
             }
             else {
                 throw std::runtime_error("Assignment to complex LHS not implemented.");
@@ -1339,42 +1344,55 @@ private:
         // Генерим соответствующий опкод
         if (op == "+") {
             fn.instructions.emplace_back(OpCode::ADD);
+            std::cout << "Generated ADD" << std::endl;
         }
         else if (op == "-") {
             fn.instructions.emplace_back(OpCode::SUB);
+            std::cout << "Generated SUB" << std::endl;
         }
         else if (op == "*") {
             fn.instructions.emplace_back(OpCode::MUL);
+            std::cout << "Generated MUL" << std::endl;
         }
         else if (op == "/") {
             fn.instructions.emplace_back(OpCode::DIV);
+            std::cout << "Generated DIV" << std::endl;
         }
         else if (op == "%") {
             fn.instructions.emplace_back(OpCode::MOD);
+            std::cout << "Generated MOD" << std::endl;
         }
         else if (op == "<") {
             fn.instructions.emplace_back(OpCode::CMP_LT);
+            std::cout << "Generated CMP_LT" << std::endl;
         }
         else if (op == "<=") {
             fn.instructions.emplace_back(OpCode::CMP_LE);
+            std::cout << "Generated CMP_LE" << std::endl;
         }
         else if (op == ">") {
             fn.instructions.emplace_back(OpCode::CMP_GT);
+            std::cout << "Generated CMP_GT" << std::endl;
         }
         else if (op == ">=") {
             fn.instructions.emplace_back(OpCode::CMP_GE);
+            std::cout << "Generated CMP_GE" << std::endl;
         }
         else if (op == "==") {
             fn.instructions.emplace_back(OpCode::CMP_EQ);
+            std::cout << "Generated CMP_EQ" << std::endl;
         }
         else if (op == "!=") {
             fn.instructions.emplace_back(OpCode::CMP_NE);
+            std::cout << "Generated CMP_NE" << std::endl;
         }
         else if (op == "&&") {
             fn.instructions.emplace_back(OpCode::AND);
+            std::cout << "Generated AND" << std::endl;
         }
         else if (op == "||") {
             fn.instructions.emplace_back(OpCode::OR);
+            std::cout << "Generated OR" << std::endl;
         }
         else if (op == "[]") {
             // Доступ к элементу массива: array[i]
@@ -1382,6 +1400,7 @@ private:
             std::string arrayName = binOp.children[0].value;
             generateExpression(binOp.children[1], globalSymbolTable, fn);
             fn.instructions.emplace_back(OpCode::LOAD_ARRAY, arrayName);
+            std::cout << "Generated LOAD_ARRAY " << arrayName << std::endl;
         }
         else if (op == "call") {
             // Вызов функции: func(args)
@@ -1389,6 +1408,7 @@ private:
             // binOp.children[1..] = аргументы
             std::string funcName = binOp.children[0].value;
             fn.instructions.emplace_back(OpCode::CALL, funcName);
+            std::cout << "Generated CALL " << funcName << std::endl;
         }
         else {
             std::cerr << "Unknown BinaryOp: " << op << std::endl;
