@@ -55,4 +55,11 @@ public:
         }
         return it->second;
     }
+    const BytecodeFunctionMy* getFunction(const std::string &fname) const {
+        int index = getFunctionIndex(fname);
+        if (index == -1) {
+            return nullptr;
+        }
+        return &functions[index];
+    }
 };

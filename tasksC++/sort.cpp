@@ -1,9 +1,4 @@
-#include <iostream>
-#include <cstring>
-
-typedef int integer;
-
-const integer MAX_SIZE = 10000;
+integer MAX_SIZE = 10000;
 integer global_array[MAX_SIZE];
 
 void sort(integer len) {

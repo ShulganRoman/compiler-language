@@ -1,206 +1,448 @@
 // VirtualMachine.h
-
 #pragma once
 
-#include "Interpreter/BytecodeGenerator.h"
+#include "Interpreter/InstructionMy.h"
+#include "Interpreter/BytecodeProgramMy.h"
+#include "Interpreter/InterpreterSymbolTable.h"
 
-#include <vector>
-#include <unordered_map>
 #include <stack>
-#include <cstdint>
+#include <unordered_map>
+#include <vector>
+#include <string>
+#include <stdexcept>
 #include <iostream>
+
+struct CallFrame {
+    const BytecodeFunctionMy* function; // Указатель на текущую функцию
+    size_t ip;                          // Указатель на текущую инструкцию
+    std::vector<int> locals;            // Локальные переменные
+
+    CallFrame(const BytecodeFunctionMy* func)
+            : function(func), ip(0), locals(func->symbolTable.variables.size(), 0) {}
+};
 
 class VirtualMachine {
 public:
-    VirtualMachine(const BytecodeProgramMy &prog)
-            : program(prog), globals(prog.nextGlobalVarIndex, 0) {
-        initializeArrays();
-    }
+    int lastReturnValue;
+    VirtualMachine(const BytecodeProgramMy& program)
+            : program(program), halted(false) {}
 
-    // Выполнить функцию по имени
-    int64_t executeFunction(const std::string &funcName) {
-        int funcIndex = program.getFunctionIndex(funcName);
-        if (funcIndex == -1) {
-            throw std::runtime_error("Function not found: " + funcName);
+    void execute() {
+        // Инициализация фрейма вызова для функции main
+        const BytecodeFunctionMy* mainFn = program.getFunction("main");
+        if (!mainFn) {
+            throw std::runtime_error("Main function not found.");
         }
 
-        const BytecodeFunctionMy &func = program.functions[funcIndex];
-        std::vector<int64_t> locals(func.numLocals, 0);
+        // Инициализируем фрейм вызова для main
+        CallFrame mainFrame(mainFn);
+        callStack.push(mainFrame);
 
-        std::stack<int64_t> vmStack;
-        size_t ip = 0; // Instruction Pointer
+        while (!callStack.empty() && !halted) {
+            CallFrame& currentFrame = callStack.top();
 
-        while (ip < func.instructions.size()) {
-            const InstructionMy &instr = func.instructions[ip];
-            switch (instr.opcode) {
-                case OpCode::LOAD_CONST:
-                    vmStack.push(instr.operandInt);
-                    break;
-
-                case OpCode::STORE_GLOBAL:
-                    if (instr.operandInt < 0 || instr.operandInt >= globals.size()) {
-                        throw std::runtime_error("Invalid global index.");
-                    }
-                    globals[instr.operandInt] = vmStack.top();
-                    vmStack.pop();
-                    break;
-
-                case OpCode::LOAD_GLOBAL:
-                    if (instr.operandInt < 0 || instr.operandInt >= globals.size()) {
-                        throw std::runtime_error("Invalid global index.");
-                    }
-                    vmStack.push(globals[instr.operandInt]);
-                    break;
-
-                case OpCode::STORE_LOCAL:
-                    if (instr.operandInt < 0 || instr.operandInt >= locals.size()) {
-                        throw std::runtime_error("Invalid local index.");
-                    }
-                    locals[instr.operandInt] = vmStack.top();
-                    vmStack.pop();
-                    break;
-
-                case OpCode::LOAD_LOCAL:
-                    if (instr.operandInt < 0 || instr.operandInt >= locals.size()) {
-                        throw std::runtime_error("Invalid local index.");
-                    }
-                    vmStack.push(locals[instr.operandInt]);
-                    break;
-
-                case OpCode::ADD: {
-                    if (vmStack.size() < 2) throw std::runtime_error("Stack underflow on ADD.");
-                    int64_t b = vmStack.top(); vmStack.pop();
-                    int64_t a = vmStack.top(); vmStack.pop();
-                    vmStack.push(a + b);
-                    break;
-                }
-
-                case OpCode::SUB: {
-                    if (vmStack.size() < 2) throw std::runtime_error("Stack underflow on SUB.");
-                    int64_t b = vmStack.top(); vmStack.pop();
-                    int64_t a = vmStack.top(); vmStack.pop();
-                    vmStack.push(a - b);
-                    break;
-                }
-
-                case OpCode::MUL: {
-                    if (vmStack.size() < 2) throw std::runtime_error("Stack underflow on MUL.");
-                    int64_t b = vmStack.top(); vmStack.pop();
-                    int64_t a = vmStack.top(); vmStack.pop();
-                    vmStack.push(a * b);
-                    break;
-                }
-
-                case OpCode::DIV: {
-                    if (vmStack.size() < 2) throw std::runtime_error("Stack underflow on DIV.");
-                    int64_t b = vmStack.top(); vmStack.pop();
-                    if (b == 0) throw std::runtime_error("Division by zero.");
-                    int64_t a = vmStack.top(); vmStack.pop();
-                    vmStack.push(a / b);
-                    break;
-                }
-
-                case OpCode::CMP_EQ: {
-                    if (vmStack.size() < 2) throw std::runtime_error("Stack underflow on CMP_EQ.");
-                    int64_t b = vmStack.top(); vmStack.pop();
-                    int64_t a = vmStack.top(); vmStack.pop();
-                    vmStack.push(a == b ? 1 : 0);
-                    break;
-                }
-
-                case OpCode::CMP_NE: {
-                    if (vmStack.size() < 2) throw std::runtime_error("Stack underflow on CMP_NE.");
-                    int64_t b = vmStack.top(); vmStack.pop();
-                    int64_t a = vmStack.top(); vmStack.pop();
-                    vmStack.push(a != b ? 1 : 0);
-                    break;
-                }
-
-                case OpCode::CMP_LT: {
-                    if (vmStack.size() < 2) throw std::runtime_error("Stack underflow on CMP_LT.");
-                    int64_t b = vmStack.top(); vmStack.pop();
-                    int64_t a = vmStack.top(); vmStack.pop();
-                    vmStack.push(a < b ? 1 : 0);
-                    break;
-                }
-
-                case OpCode::CMP_GT: {
-                    if (vmStack.size() < 2) throw std::runtime_error("Stack underflow on CMP_GT.");
-                    int64_t b = vmStack.top(); vmStack.pop();
-                    int64_t a = vmStack.top(); vmStack.pop();
-                    vmStack.push(a > b ? 1 : 0);
-                    break;
-                }
-
-                case OpCode::JMP_IF_FALSE: {
-                    if (vmStack.empty()) throw std::runtime_error("Stack underflow on JMP_IF_FALSE.");
-                    int64_t condition = vmStack.top(); vmStack.pop();
-                    if (condition == 0) {
-                        ip = static_cast<size_t>(instr.operandInt);
-                        continue; // Пропускаем инкремент ip
-                    }
-                    break;
-                }
-
-                case OpCode::JMP: {
-                    ip = static_cast<size_t>(instr.operandInt);
-                    continue; // Пропускаем инкремент ip
-                }
-
-                case OpCode::RET: {
-                    if (vmStack.empty()) return 0; // Если нет значения, возвращаем 0
-                    return vmStack.top();
-                }
-
-                case OpCode::HALT: {
-                    return 0; // Завершаем выполнение
-                }
-
-                case OpCode::LOAD_ARRAY: {
-                    // operandInt = индекс массива в program.globalArrays
-                    if (vmStack.empty()) throw std::runtime_error("Stack underflow on LOAD_ARRAY.");
-                    int64_t index = vmStack.top(); vmStack.pop();
-                    if (index < 0 || static_cast<size_t>(index) >= arrays[instr.operandInt].size()) {
-                        throw std::runtime_error("Array index out of bounds.");
-                    }
-                    vmStack.push(arrays[instr.operandInt][index]);
-                    break;
-                }
-
-                case OpCode::STORE_ARRAY: {
-                    // operandInt = индекс массива в program.globalArrays
-                    if (vmStack.size() < 2) throw std::runtime_error("Stack underflow on STORE_ARRAY.");
-                    int64_t value = vmStack.top(); vmStack.pop();
-                    int64_t index = vmStack.top(); vmStack.pop();
-                    if (index < 0 || static_cast<size_t>(index) >= arrays[instr.operandInt].size()) {
-                        throw std::runtime_error("Array index out of bounds.");
-                    }
-                    arrays[instr.operandInt][index] = value;
-                    break;
-                }
-
-                default:
-                    throw std::runtime_error("Unknown OpCode encountered.");
+            if (currentFrame.ip >= currentFrame.function->instructions.size()) {
+                // Если достигнут конец функции без RET, автоматически возвращаемся
+                callStack.pop();
+                continue;
             }
-            ip++;
-        }
 
-        return 0;
+            InstructionMy instr = currentFrame.function->instructions[currentFrame.ip];
+            currentFrame.ip++;
+
+            try {
+                executeInstruction(instr, currentFrame);
+            }
+            catch (const std::exception& e) {
+                std::cerr << "Runtime Error: " << e.what() << std::endl;
+                halted = true;
+            }
+        }
+        printStack();
+        printGlobalVariables();
     }
 
 private:
-    const BytecodeProgramMy &program;
-    std::vector<int64_t> globals; // Объявление globals
-    std::vector<std::vector<int64_t>> arrays;
+    const BytecodeProgramMy& program;
+    std::stack<CallFrame> callStack;
+    std::stack<int> operandStack;
+    std::unordered_map<std::string, int> globalVariables;
+    bool halted;
 
-    // Инициализация массивов
-    void initializeArrays() {
-        arrays.resize(program.nextGlobalArrayIndex, std::vector<int64_t>());
-        for (const auto &pair: program.globalArrays) {
-            int index = pair.second;
-            // Здесь можно хранить размеры массивов, например, в отдельной таблице
-            // Для примера инициализируем массив размером 10000
-            arrays[index].resize(10000, 0);
+    void executeInstruction(const InstructionMy& instr, CallFrame& frame) {
+        // Отладочный вывод текущей инструкции
+        std::cout << "Executing " << opcodeToString(instr.opcode);
+        if (!instr.operandStr.empty()) {
+            std::cout << " " << instr.operandStr;
         }
+        if (instr.operandInt != 0) {
+            std::cout << " " << instr.operandInt;
+        }
+        std::cout << std::endl;
+        switch (instr.opcode) {
+            // Работа с памятью
+            case OpCode::LOAD_GLOBAL:
+                loadGlobal(instr.operandStr);
+                break;
+            case OpCode::STORE_GLOBAL:
+                storeGlobal(instr.operandStr);
+                break;
+            case OpCode::LOAD_LOCAL:
+                loadLocal(instr.operandInt, frame);
+                break;
+            case OpCode::STORE_LOCAL:
+                storeLocal(instr.operandInt, frame);
+                break;
+            case OpCode::LOAD_CONST:
+                loadConst(instr.operandInt);
+                break;
+
+                // Арифметика
+            case OpCode::ADD:
+                add();
+                break;
+            case OpCode::SUB:
+                sub();
+                break;
+            case OpCode::MUL:
+                mul();
+                break;
+            case OpCode::DIV:
+                divInstr();
+                break;
+            case OpCode::MOD:
+                mod();
+                break;
+
+                // Сравнения
+            case OpCode::CMP_EQ:
+                cmp_eq();
+                break;
+            case OpCode::CMP_NE:
+                cmp_ne();
+                break;
+            case OpCode::CMP_LT:
+                cmp_lt();
+                break;
+            case OpCode::CMP_GT:
+                cmp_gt();
+                break;
+            case OpCode::CMP_LE:
+                cmp_le();
+                break;
+            case OpCode::CMP_GE:
+                cmp_ge();
+                break;
+
+                // Логические
+            case OpCode::AND:
+                logical_and();
+                break;
+            case OpCode::OR:
+                logical_or();
+                break;
+            case OpCode::NOT:
+                logical_not();
+                break;
+
+                // Работа с массивами
+            case OpCode::LOAD_ARRAY:
+                loadArray(instr.operandStr);
+                break;
+            case OpCode::STORE_ARRAY:
+                storeArray(instr.operandStr);
+                break;
+
+                // Управление потоком
+            case OpCode::JMP:
+                jmp(instr.operandInt, frame);
+                break;
+            case OpCode::JMP_IF_FALSE:
+                jmp_if_false(instr.operandInt, frame);
+                break;
+            case OpCode::CALL:
+                callFunction(instr.operandStr);
+                break;
+            case OpCode::RET:
+                ret(frame);
+                break;
+            case OpCode::HALT:
+                halt();
+                break;
+
+            default:
+                throw std::runtime_error("Unknown opcode encountered.");
+        }
+    }
+
+    void printStack() const {
+        std::stack<int> tempStack = operandStack;
+        std::vector<int> stackElements;
+        while (!tempStack.empty()) {
+            stackElements.push_back(tempStack.top());
+            tempStack.pop();
+        }
+        std::cout << "Operand Stack (top to bottom): ";
+        for (auto it = stackElements.begin(); it != stackElements.end(); ++it) {
+            std::cout << *it << " ";
+        }
+        std::cout << std::endl;
+    }
+
+    void printGlobalVariables() const {
+        std::cout << "Global Variables:" << std::endl;
+        for (const auto& [name, value] : globalVariables) {
+            std::cout << "  " << name << " = " << value << std::endl;
+        }
+    }
+
+    // Методы обработки опкодов
+
+    // Работа с памятью
+    void loadGlobal(const std::string& varName) {
+        if (globalVariables.find(varName) == globalVariables.end()) {
+            throw std::runtime_error("Undefined global variable: " + varName);
+        }
+        operandStack.push(globalVariables[varName]);
+    }
+
+    void storeGlobal(const std::string& varName) {
+        if (globalVariables.find(varName) == globalVariables.end()) {
+            throw std::runtime_error("Undefined global variable: " + varName);
+        }
+        if (operandStack.empty()) {
+            throw std::runtime_error("Operand stack underflow on STORE_GLOBAL.");
+        }
+        int value = operandStack.top();
+        operandStack.pop();
+        globalVariables[varName] = value;
+    }
+
+    void loadLocal(int varIndex, CallFrame& frame) {
+        if (varIndex < 0 || varIndex >= frame.locals.size()) {
+            throw std::runtime_error("Invalid local variable index: " + std::to_string(varIndex));
+        }
+        operandStack.push(frame.locals[varIndex]);
+    }
+
+    void storeLocal(int varIndex, CallFrame& frame) {
+        if (varIndex < 0 || varIndex >= frame.locals.size()) {
+            throw std::runtime_error("Invalid local variable index: " + std::to_string(varIndex));
+        }
+        if (operandStack.empty()) {
+            throw std::runtime_error("Operand stack underflow on STORE_LOCAL.");
+        }
+        int value = operandStack.top();
+        operandStack.pop();
+        frame.locals[varIndex] = value;
+    }
+
+    void loadConst(int value) {
+        operandStack.push(value);
+    }
+
+    // Арифметические операции
+    void add() {
+        binaryOp([](int a, int b) -> int { return a + b; }, "ADD");
+    }
+
+    void sub() {
+        binaryOp([](int a, int b) -> int { return a - b; }, "SUB");
+    }
+
+    void mul() {
+        binaryOp([](int a, int b) -> int { return a * b; }, "MUL");
+    }
+
+    void divInstr() {
+        binaryOp([](int a, int b) -> int {
+            if (b == 0) throw std::runtime_error("Division by zero.");
+            return a / b;
+        }, "DIV");
+    }
+
+    void mod() {
+        binaryOp([](int a, int b) -> int {
+            if (b == 0) throw std::runtime_error("Modulo by zero.");
+            return a % b;
+        }, "MOD");
+    }
+
+    // Сравнительные операции
+    void cmp_eq() {
+        binaryCompare([](int a, int b) -> int { return (a == b) ? 1 : 0; }, "CMP_EQ");
+    }
+
+    void cmp_ne() {
+        binaryCompare([](int a, int b) -> int { return (a != b) ? 1 : 0; }, "CMP_NE");
+    }
+
+    void cmp_lt() {
+        binaryCompare([](int a, int b) -> int { return (a < b) ? 1 : 0; }, "CMP_LT");
+    }
+
+    void cmp_gt() {
+        binaryCompare([](int a, int b) -> int { return (a > b) ? 1 : 0; }, "CMP_GT");
+    }
+
+    void cmp_le() {
+        binaryCompare([](int a, int b) -> int { return (a <= b) ? 1 : 0; }, "CMP_LE");
+    }
+
+    void cmp_ge() {
+        binaryCompare([](int a, int b) -> int { return (a >= b) ? 1 : 0; }, "CMP_GE");
+    }
+
+    // Логические операции
+    void logical_and() {
+        binaryOp([](int a, int b) -> int { return (a && b) ? 1 : 0; }, "AND");
+    }
+
+    void logical_or() {
+        binaryOp([](int a, int b) -> int { return (a || b) ? 1 : 0; }, "OR");
+    }
+
+    void logical_not() {
+        if (operandStack.empty()) {
+            throw std::runtime_error("Operand stack underflow on NOT.");
+        }
+        int a = operandStack.top();
+        operandStack.pop();
+        operandStack.push((!a) ? 1 : 0);
+    }
+
+    // Работа с массивами
+    void loadArray(const std::string& arrayName) {
+        if (globalVariables.find(arrayName) == globalVariables.end()) {
+            throw std::runtime_error("Undefined array: " + arrayName);
+        }
+        if (operandStack.empty()) {
+            throw std::runtime_error("Operand stack underflow on LOAD_ARRAY.");
+        }
+        int index = operandStack.top();
+        operandStack.pop();
+
+        // Здесь предполагается, что массивы хранятся как линейные списки в глобальных переменных
+        // Вы можете изменить этот механизм в зависимости от вашей реализации массивов
+        // Например, использовать отдельную таблицу для массивов
+
+        // Для простоты, предполагаем, что массив хранится в глобVariables как базовый индекс
+        // Необходимо расширить глобVariables для поддержки массивов
+        // Ниже приведен пример простой реализации с массивами, хранящимися как std::vector<int>
+
+        throw std::runtime_error("LOAD_ARRAY not implemented.");
+    }
+
+    void storeArray(const std::string& arrayName) {
+        if (globalVariables.find(arrayName) == globalVariables.end()) {
+            throw std::runtime_error("Undefined array: " + arrayName);
+        }
+        if (operandStack.size() < 2) {
+            throw std::runtime_error("Operand stack underflow on STORE_ARRAY.");
+        }
+        int value = operandStack.top(); operandStack.pop();
+        int index = operandStack.top(); operandStack.pop();
+
+        // Аналогично LOAD_ARRAY, здесь необходимо реализовать хранение и доступ к массивам
+        throw std::runtime_error("STORE_ARRAY not implemented.");
+    }
+
+    // Управление потоком
+    void jmp(int target, CallFrame& frame) {
+        if (target < 0 || target >= frame.function->instructions.size()) {
+            throw std::runtime_error("Invalid JMP target: " + std::to_string(target));
+        }
+        frame.ip = target;
+    }
+
+    void jmp_if_false(int target, CallFrame& frame) {
+        if (operandStack.empty()) {
+            throw std::runtime_error("Operand stack underflow on JMP_IF_FALSE.");
+        }
+        int condition = operandStack.top();
+        operandStack.pop();
+        if (condition == 0) {
+            if (target < 0 || target >= frame.function->instructions.size()) {
+                throw std::runtime_error("Invalid JMP_IF_FALSE target: " + std::to_string(target));
+            }
+            frame.ip = target;
+        }
+    }
+
+    void callFunction(const std::string& funcName) {
+        const BytecodeFunctionMy* func = program.getFunction(funcName);
+        if (!func) {
+            throw std::runtime_error("Undefined function: " + funcName);
+        }
+
+        // Получение количества параметров
+        size_t paramCount = func->symbolTable.variables.size(); // Предполагается, что все переменные в symbolTable — это параметры
+
+        // Извлечение параметров из стека
+        std::vector<int> params;
+        for (size_t i = 0; i < paramCount; ++i) {
+            if (operandStack.empty()) {
+                throw std::runtime_error("Operand stack underflow on CALL.");
+            }
+            params.push_back(operandStack.top());
+            operandStack.pop();
+        }
+        std::reverse(params.begin(), params.end()); // Параметры были добавлены в обратном порядке
+
+        // Создание нового фрейма вызова
+        CallFrame newFrame(func);
+        for (size_t i = 0; i < params.size(); ++i) {
+            if (i < newFrame.locals.size()) {
+                newFrame.locals[i] = params[i];
+            }
+            else {
+                throw std::runtime_error("Too many parameters provided to function: " + funcName);
+            }
+        }
+
+        callStack.push(newFrame);
+    }
+
+    void ret(CallFrame& frame) {
+        if (callStack.empty()) {
+            throw std::runtime_error("Call stack underflow on RET.");
+        }
+
+        // Получение возвращаемого значения, если есть
+        int retValue = 0;
+        if (!operandStack.empty()) {
+            retValue = operandStack.top();
+            operandStack.pop();
+        }
+
+        callStack.pop(); // Удаление текущего фрейма
+
+        if (callStack.empty()) {
+            // Если стек вызовов пуст, сохраняем возвращённое значение
+            lastReturnValue = retValue;
+        }
+        else {
+            operandStack.push(retValue);
+        }
+    }
+
+
+    void halt() {
+        halted = true;
+    }
+
+    // Вспомогательные методы для арифметических и сравнительных операций
+    void binaryOp(std::function<int(int, int)> opFunc, const std::string& opName) {
+        if (operandStack.size() < 2) {
+            throw std::runtime_error("Operand stack underflow on " + opName + ".");
+        }
+        int b = operandStack.top(); operandStack.pop();
+        int a = operandStack.top(); operandStack.pop();
+        int result = opFunc(a, b);
+        operandStack.push(result);
+    }
+
+    void binaryCompare(std::function<int(int, int)> cmpFunc, const std::string& cmpName) {
+        binaryOp(cmpFunc, cmpName);
     }
 };

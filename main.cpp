@@ -5,6 +5,7 @@
 #include "LLVM/CodeGenerator.h"
 #include "Interpreter/InstructionMy.h"
 #include "Interpreter/BytecodeGenerator.h"
+#include "VM.h"
 #include <llvm/Support/raw_ostream.h>
 
 void printAST(const ASTNode &node, int indent=0) {
@@ -29,19 +30,16 @@ int main() {
 
 
     std::string code = R"(
-integer MAX_SIZE = 5;
-integer global_array[MAX_SIZE];
+integer factorial_calc(integer num){
+    if (num == 0){
+        return 1;
+    } else { return num * factorial_calc(num - 1);}
+}
 
-void sort(integer len) {
-    for (integer i = 1; i < len; i = i + 1) {
-        integer key = global_array[i];
-        integer j = i - 1;
-        while (j >= 0 && global_array[j] > key) {
-            global_array[j + 1] = global_array[j];
-            j = j - 1;
-        }
-        global_array[j + 1] = key;
-    }
+integer main(){
+    integer x=43;
+    print(x);
+    return factorial_calc(6);
 }
 )";
 
@@ -83,18 +81,19 @@ void sort(integer len) {
         return 1;
     }
 
-    // 6. Генерация кода с помощью LLVM
-    try {
-        CodeGenerator codeGen(analyzer.getSymbolTable());
-        std::unique_ptr<llvm::Module> module = codeGen.generate(root);
-        std::cout << "\n=== Generated LLVM IR ===\n";
-        module->print(llvm::outs(), nullptr);
-    } catch (const std::exception &ex) {
-        std::cerr << "LLVM generation error: " << ex.what() << std::endl;
-    }
+//    // 6. Генерация кода с помощью LLVM
+//    try {
+//        CodeGenerator codeGen(analyzer.getSymbolTable());
+//        std::unique_ptr<llvm::Module> module = codeGen.generate(root);
+//        std::cout << "\n=== Generated LLVM IR ===\n";
+//        module->print(llvm::outs(), nullptr);
+//    } catch (const std::exception &ex) {
+//        std::cerr << "LLVM generation error: " << ex.what() << std::endl;
+//    }
 
 
     // 7. Генерация собственным интерпретатором
+    // 7. Генерация собственным интерпретатором и выполнение байткода
     try {
         MyBytecodeGenerator generator;
         BytecodeProgramMy program = generator.generate(root);
@@ -109,8 +108,17 @@ void sort(integer len) {
                           << " str='" << ins.operandStr << "'\n";
             }
         }
+
+        // Создание и запуск VM
+        VirtualMachine vm(program);
+        std::cout << "\n=== VM EXECUTION ===\n";
+        vm.execute();
+
+        // Вывод последнего возвращённого значения
+        std::cout << "Program returned: " << vm.lastReturnValue << std::endl;
+
     } catch (const std::exception &ex){
-        std::cerr << "Bytecode programm error: " << ex.what() << std::endl;
+        std::cerr << "Bytecode program error: " << ex.what() << std::endl;
         return 1;
     }
 
