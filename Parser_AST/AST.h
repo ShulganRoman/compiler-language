@@ -1,5 +1,4 @@
-#ifndef COMPILER_LANGUAGE_PARSER_H
-#define COMPILER_LANGUAGE_PARSER_H
+#pragma once
 
 #include "../Lexer/Lexer.h"
 #include <stdexcept>
@@ -276,7 +275,7 @@ private:
             throw std::runtime_error("Expected ';' after var_decl");
         }
         advance(); // ';'
-        std::cout << "parseVarDecl found varName='" << ident.name << "', type='" << typeKw.name << "', isArray=" << "..." << "\n";
+//        std::cout << "parseVarDecl found varName='" << ident.name << "', type='" << typeKw.name << "', isArray=" << "..." << "\n";
         return varDecl;
     }
 
@@ -844,5 +843,3 @@ private:
         return node;
     }
 };
-
-#endif // COMPILER_LANGUAGE_PARSER_H

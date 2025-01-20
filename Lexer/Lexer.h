@@ -1,5 +1,4 @@
-#ifndef COMPILER_LANGUAGE_LEXER_H
-#define COMPILER_LANGUAGE_LEXER_H
+#pragma once
 
 #include <iostream>
 #include <string>
@@ -319,5 +318,3 @@ private:
         return Token(name, type, std::nullopt, line, col - (int)name.size());
     }
 };
-
-#endif // COMPILER_LANGUAGE_LEXER_H

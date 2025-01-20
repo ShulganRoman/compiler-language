@@ -1,9 +1,4 @@
-//
-// Created by Тихонов Александр on 26.12.2024.
-//
-
-#ifndef COMPILER_LANGUAGE_SEMANTICANALYZER_H
-#define COMPILER_LANGUAGE_SEMANTICANALYZER_H
+#pragma once
 
 #include "../Parser_AST/AST.h"
 #include "SymbolTable.h"
@@ -625,5 +620,3 @@ private:
         }
     }
 };
-
-#endif //COMPILER_LANGUAGE_SEMANTICANALYZER_H

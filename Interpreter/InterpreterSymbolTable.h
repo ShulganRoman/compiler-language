@@ -67,7 +67,7 @@ public:
             throw std::runtime_error("No scope to exit.");
         }
         scopes.pop_back();
-        std::cout << "Exited scope. Total scopes: " << scopes.size() << std::endl;
+//        std::cout << "Exited scope. Total scopes: " << scopes.size() << std::endl;
     }
 
     // Добавляет переменную и возвращает её индекс
@@ -82,7 +82,7 @@ public:
         int index = variables.size();
         variables.push_back(var);
         currentScope[var.name] = index;
-        std::cout << "Added variable: " << var.name << " (Index: " << index << ")" << std::endl;
+//        std::cout << "Added variable: " << var.name << " (Index: " << index << ")" << std::endl;
         return index;
     }
 
@@ -94,7 +94,7 @@ public:
         int index = functionList.size();
         functionList.push_back(funcName);
         functions[funcName] = index;
-        std::cout << "Added function: " << funcName << " (Index: " << index << ")" << std::endl;
+//        std::cout << "Added function: " << funcName << " (Index: " << index << ")" << std::endl;
         return index;
     }
 

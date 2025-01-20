@@ -1,6 +1,3 @@
-//
-// Created by Тихонов Александр on 18.01.2025.
-//
 #pragma once
 #include <string>
 #include <vector>

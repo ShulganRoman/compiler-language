@@ -26,7 +26,6 @@ add_executable(compiler_language
         Parser_AST/AST.h
         SemanticAnalyzer/SemanticAnalyzer.h
         SemanticAnalyzer/SymbolTable.h
-        tasksC++/test.cpp
         LLVM/CodeGenerator.h
         LLVM/CodeGenerator.cpp
         Interpreter/InstructionMy.h
@@ -34,6 +33,8 @@ add_executable(compiler_language
         Interpreter/BytecodeProgramMy.h
         VM.h
         Interpreter/InterpreterSymbolTable.h
+        Parser_AST/AST_Optimizer.h
+        tasksC++/test.h
 )
 
 # Связать проект с библиотеками LLVM

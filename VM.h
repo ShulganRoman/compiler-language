@@ -1,4 +1,3 @@
-// VirtualMachine.h
 #pragma once
 
 #include "Interpreter/InstructionMy.h"
@@ -42,7 +41,6 @@ public:
             CallFrame& currentFrame = callStack.top();
 
             if (currentFrame.ip >= currentFrame.function->instructions.size()) {
-                // Если достигнут конец функции без RET, автоматически возвращаемся
                 callStack.pop();
                 continue;
             }
@@ -74,15 +72,6 @@ private:
 
 
     void executeInstruction(const InstructionMy& instr, CallFrame& frame) {
-        // Отладочный вывод текущей инструкции
-//        std::cout << "Executing " << opcodeToString(instr.opcode);
-//        if (!instr.operandStr.empty()) {
-//            std::cout << " " << instr.operandStr;
-//        }
-//        if (instr.operandInt != 0) {
-//            std::cout << " " << instr.operandInt;
-//        }
-//        std::cout << std::endl;
         switch (instr.opcode) {
             // Работа с памятью
             case OpCode::LOAD_GLOBAL:

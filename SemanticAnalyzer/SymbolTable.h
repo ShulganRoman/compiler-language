@@ -1,5 +1,4 @@
-#ifndef COMPILER_LANGUAGE_SYMBOLTABLE_H
-#define COMPILER_LANGUAGE_SYMBOLTABLE_H
+#pragma once
 
 #include <string>
 #include <unordered_map>
@@ -57,6 +56,3 @@ public:
 private:
     std::vector<std::unordered_map<std::string, Symbol>> scopes;
 };
-
-#endif // COMPILER_LANGUAGE_SYMBOLTABLE_H
-
