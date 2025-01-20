@@ -23,33 +23,41 @@ void printAST(const ASTNode &node, int indent=0) {
 }
 
 int main() {
-
     std::string code = R"(
-integer global_array[10];
+bool is_prime[10000];
+integer primes[10000];
 
 integer main(){
-    integer num = 10;
-    integer MAX_SIZE = 10;
-    for (integer i = 0; i < MAX_SIZE; i=i+1) {
-        global_array[i] = num;
-        num = num-1;
-    }
-    for (integer i = 0; i < MAX_SIZE; i=i+1) {
-        print(global_array[i]);
-    }
-    print(12121212121);
-    for (integer i = 1; i < MAX_SIZE; i = i + 1) {
-        integer key = global_array[i];
-        integer j = i - 1;
-        while (j > 0 && global_array[j] > key) {
-            global_array[j + 1] = global_array[j];
-            j = j - 1;
-        }
-        global_array[j + 1] = key;
+    integer n = 9999;
+    for (integer i = 0; i < n; i = i + 1) {
+        is_prime[i] = true;
     }
 
-    for (integer i = 0; i < MAX_SIZE; i=i+1) {
-        print(global_array[i]);
+    is_prime[0] = false;
+    is_prime[1] = false;
+
+    for (integer i = 2; i * i < n; i = i + 1) {
+        if (is_prime[i] == true) {
+            for (integer j = i * i; j < n; j = j + i) {
+                is_prime[j] = false;
+            }
+        }
+    }
+
+    integer prime_count = 0;
+    for (integer i = 2; i <= n; i = i + 1) {
+        if (is_prime[i]) {
+            primes[prime_count] = i;
+            prime_count = prime_count + 1;
+        }
+    }
+    integer fin = 1-2;
+    primes[prime_count] = fin;
+
+    integer i = 0;
+    while (primes[i] != fin){
+        print(primes[i]);
+        i=i+1;
     }
     return 0;
 }

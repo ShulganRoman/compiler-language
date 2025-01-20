@@ -129,10 +129,14 @@ private:
         }
 
         if (isArray) {
-            // Инициализация массива нулями (или чем-то ещё)
-            // например, в цикле LOAD_CONST 0 / STORE_ARRAY varName
             for (int i = 0; i < arraySize; i++) {
+                // Сначала индекс:
+                mainFn.instructions.emplace_back(OpCode::LOAD_CONST, i);
+
+                // Затем значение:
                 mainFn.instructions.emplace_back(OpCode::LOAD_CONST, 0);
+
+                // И теперь STORE_ARRAY
                 mainFn.instructions.emplace_back(OpCode::STORE_ARRAY, varName);
             }
         } else {
@@ -673,75 +677,52 @@ private:
 
         // Обработка присваивания непосредственно здесь
         if (op == "=") {
-            // Логика присваивания: a = b + c
-            // Генерим RHS (b + c)
-            generateExpression(binOp.children[1], globalSymbolTable, fn);
-
-            // Определяем LHS
+            // LHS (слева от =)
             const ASTNode &lhs = binOp.children[0];
+            // RHS (справа от =)
+            const ASTNode &rhs = binOp.children[1];
+
+            // Случай 1: Присваивание обычной переменной `x = <expr>`
             if (lhs.type == ASTNodeType::Identifier) {
+                // Сначала генерируем rhs -> push value
+                generateExpression(rhs, globalSymbolTable, fn);
+
+                // Определяем, глобальная или локальная
                 std::string varName = lhs.value;
-
                 bool isGlobal = globalSymbolTable.hasVariable(varName);
-                bool isLocal = fn.symbolTable.hasVariable(varName);
+                bool isLocal  = fn.symbolTable.hasVariable(varName);
 
-//                std::cout << "Assignment to variable: " << varName
-//                          << ", isGlobal: " << isGlobal
-//                          << ", isLocal: " << isLocal << std::endl;
-
-                if (!isGlobal && !isLocal) {
-                    throw std::runtime_error("Undefined variable: " + varName);
-                }
-
+                // Затем делаем STORE_GLOBAL или STORE_LOCAL
                 if (isGlobal) {
-                    int constVal;
-                    if (globalSymbolTable.hasConstant(varName, constVal)) {
-                        throw std::runtime_error("Cannot modify constant variable: " + varName);
-                    }
-                    // Присваиваем значение глобальной переменной
                     fn.instructions.emplace_back(OpCode::STORE_GLOBAL, varName);
-//                    std::cout << "Assigned to global variable: " << varName << std::endl;
-                }
-                else if (isLocal) {
-                    int constVal;
-                    if (fn.symbolTable.hasConstant(varName, constVal)) {
-                        throw std::runtime_error("Cannot modify constant variable: " + varName);
-                    }
-                    // Присваиваем значение локальной переменной
+                } else {
                     int localIndex = fn.symbolTable.getVariableIndex(varName);
-//                    std::cout << "Assigned to local variable: " << varName << " (Index: " << localIndex << ")" << std::endl;
                     fn.instructions.emplace_back(OpCode::STORE_LOCAL, localIndex);
                 }
             }
+
+                // Случай 2: Присваивание элементу массива `A[i] = <expr>`
             else if (lhs.type == ASTNodeType::BinaryOp && lhs.value == "[]") {
-                // Присваивание элементу массива: array[i] = value
-                if (lhs.children.size() != 2) {
-                    throw std::runtime_error("Array assignment requires two children: array name and index");
-                }
+                // например, A[i] = rhs
+                // lhs.children[0] = A
+                // lhs.children[1] = i
+
                 std::string arrayName = lhs.children[0].value;
 
-                // Проверяем, существует ли массив в глобальной таблице
-                if (!globalSymbolTable.hasVariable(arrayName)) {
-                    throw std::runtime_error("Undefined array: " + arrayName);
-                }
-
-                // Генерируем индекс
+                // 1) push index
                 generateExpression(lhs.children[1], globalSymbolTable, fn);
 
-                // Проверяем, является ли массив константой
-                int constVal;
-                if (globalSymbolTable.hasConstant(arrayName, constVal)) {
-                    throw std::runtime_error("Cannot modify constant array: " + arrayName);
-                }
+                // 2) push value
+                generateExpression(rhs, globalSymbolTable, fn);
 
-                // Присваиваем значение элементу массива
+                // 3) STORE_ARRAY
                 fn.instructions.emplace_back(OpCode::STORE_ARRAY, arrayName);
-//                std::cout << "Assigned to array: " << arrayName << std::endl;
             }
             else {
                 throw std::runtime_error("Assignment to complex LHS not implemented.");
             }
-            return;
+
+            return; // Выйти из generateBinaryOp
         }
 
         // Обычные бинарные операции: +, -, *, /, и т.д.
@@ -857,7 +838,7 @@ private:
 //                    return val;
 //                }
 //                throw std::runtime_error("Array size identifier is not a constant: " + exprNode.value);
-                return 10;
+                return 10000;
             }
 
             case ASTNodeType::BinaryOp: {
