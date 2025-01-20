@@ -23,23 +23,35 @@ void printAST(const ASTNode &node, int indent=0) {
 }
 
 int main() {
-    static const int MAX_SIZE = 10000;
-    static bool is_prime[MAX_SIZE];
-    bool test2 = false;
-    is_prime[1]=test2;
-
 
     std::string code = R"(
-integer factorial_calc(integer num){
-    if (num == 0){
-        return 1;
-    } else { return num * factorial_calc(num - 1);}
-}
+integer global_array[10];
 
 integer main(){
-    integer x=43;
-    print(x);
-    return factorial_calc(6);
+    integer num = 10;
+    integer MAX_SIZE = 10;
+    for (integer i = 0; i < MAX_SIZE; i=i+1) {
+        global_array[i] = num;
+        num = num-1;
+    }
+    for (integer i = 0; i < MAX_SIZE; i=i+1) {
+        print(global_array[i]);
+    }
+    print(12121212121);
+    for (integer i = 1; i < MAX_SIZE; i = i + 1) {
+        integer key = global_array[i];
+        integer j = i - 1;
+        while (j > 0 && global_array[j] > key) {
+            global_array[j + 1] = global_array[j];
+            j = j - 1;
+        }
+        global_array[j + 1] = key;
+    }
+
+    for (integer i = 0; i < MAX_SIZE; i=i+1) {
+        print(global_array[i]);
+    }
+    return 0;
 }
 )";
 
@@ -93,7 +105,6 @@ integer main(){
 
 
     // 7. Генерация собственным интерпретатором
-    // 7. Генерация собственным интерпретатором и выполнение байткода
     try {
         MyBytecodeGenerator generator;
         BytecodeProgramMy program = generator.generate(root);
@@ -118,7 +129,7 @@ integer main(){
         std::cout << "Program returned: " << vm.lastReturnValue << std::endl;
 
     } catch (const std::exception &ex){
-        std::cerr << "Bytecode program error: " << ex.what() << std::endl;
+        std::cerr << "Bytecode/VM program error: " << ex.what() << std::endl;
         return 1;
     }
 

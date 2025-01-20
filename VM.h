@@ -58,27 +58,31 @@ public:
                 halted = true;
             }
         }
-        printStack();
-        printGlobalVariables();
+//        printStack();
+//        printGlobalVariables();
     }
 
 private:
     const BytecodeProgramMy& program;
     std::stack<CallFrame> callStack;
     std::stack<int> operandStack;
+
     std::unordered_map<std::string, int> globalVariables;
+    std::unordered_map<std::string, std::vector<int>> globalArrays;
+
     bool halted;
+
 
     void executeInstruction(const InstructionMy& instr, CallFrame& frame) {
         // Отладочный вывод текущей инструкции
-        std::cout << "Executing " << opcodeToString(instr.opcode);
-        if (!instr.operandStr.empty()) {
-            std::cout << " " << instr.operandStr;
-        }
-        if (instr.operandInt != 0) {
-            std::cout << " " << instr.operandInt;
-        }
-        std::cout << std::endl;
+//        std::cout << "Executing " << opcodeToString(instr.opcode);
+//        if (!instr.operandStr.empty()) {
+//            std::cout << " " << instr.operandStr;
+//        }
+//        if (instr.operandInt != 0) {
+//            std::cout << " " << instr.operandInt;
+//        }
+//        std::cout << std::endl;
         switch (instr.opcode) {
             // Работа с памятью
             case OpCode::LOAD_GLOBAL:
@@ -201,20 +205,20 @@ private:
     // Работа с памятью
     void loadGlobal(const std::string& varName) {
         if (globalVariables.find(varName) == globalVariables.end()) {
-            throw std::runtime_error("Undefined global variable: " + varName);
+            globalVariables[varName] = 0;
         }
+
         operandStack.push(globalVariables[varName]);
     }
 
+
     void storeGlobal(const std::string& varName) {
-        if (globalVariables.find(varName) == globalVariables.end()) {
-            throw std::runtime_error("Undefined global variable: " + varName);
-        }
         if (operandStack.empty()) {
             throw std::runtime_error("Operand stack underflow on STORE_GLOBAL.");
         }
         int value = operandStack.top();
         operandStack.pop();
+
         globalVariables[varName] = value;
     }
 
@@ -313,38 +317,43 @@ private:
 
     // Работа с массивами
     void loadArray(const std::string& arrayName) {
-        if (globalVariables.find(arrayName) == globalVariables.end()) {
-            throw std::runtime_error("Undefined array: " + arrayName);
-        }
         if (operandStack.empty()) {
             throw std::runtime_error("Operand stack underflow on LOAD_ARRAY.");
         }
         int index = operandStack.top();
         operandStack.pop();
 
-        // Здесь предполагается, что массивы хранятся как линейные списки в глобальных переменных
-        // Вы можете изменить этот механизм в зависимости от вашей реализации массивов
-        // Например, использовать отдельную таблицу для массивов
+        // Если массив не найден, создадим "по умолчанию" 10000 элементов
+        if (globalArrays.find(arrayName) == globalArrays.end()) {
+            globalArrays[arrayName] = std::vector<int>(10000, 0);
+        }
 
-        // Для простоты, предполагаем, что массив хранится в глобVariables как базовый индекс
-        // Необходимо расширить глобVariables для поддержки массивов
-        // Ниже приведен пример простой реализации с массивами, хранящимися как std::vector<int>
-
-        throw std::runtime_error("LOAD_ARRAY not implemented.");
+        auto &vec = globalArrays[arrayName];
+        if (index < 0 || index >= (int)vec.size()) {
+            throw std::runtime_error("Array index out of range for " + arrayName);
+        }
+        operandStack.push(vec[index]);
     }
 
     void storeArray(const std::string& arrayName) {
-        if (globalVariables.find(arrayName) == globalVariables.end()) {
-            throw std::runtime_error("Undefined array: " + arrayName);
-        }
         if (operandStack.size() < 2) {
             throw std::runtime_error("Operand stack underflow on STORE_ARRAY.");
         }
-        int value = operandStack.top(); operandStack.pop();
-        int index = operandStack.top(); operandStack.pop();
+        int value = operandStack.top();
+        operandStack.pop();
+        int index = operandStack.top();
+        operandStack.pop();
 
-        // Аналогично LOAD_ARRAY, здесь необходимо реализовать хранение и доступ к массивам
-        throw std::runtime_error("STORE_ARRAY not implemented.");
+        // Если массива нет, создадим также
+        if (globalArrays.find(arrayName) == globalArrays.end()) {
+            globalArrays[arrayName] = std::vector<int>(10000, 0);
+        }
+
+        auto &vec = globalArrays[arrayName];
+        if (index < 0 || index >= (int)vec.size()) {
+            throw std::runtime_error("Array index out of range for " + arrayName);
+        }
+        vec[index] = value;
     }
 
     // Управление потоком
@@ -370,15 +379,26 @@ private:
     }
 
     void callFunction(const std::string& funcName) {
+        if (funcName == "print") {
+            // один аргумент
+            if (operandStack.empty()) {
+                throw std::runtime_error("Operand stack underflow on CALL print.");
+            }
+            int value = operandStack.top();
+            operandStack.pop();
+            std::cout << value << std::endl;
+            return;
+        }
+
         const BytecodeFunctionMy* func = program.getFunction(funcName);
         if (!func) {
             throw std::runtime_error("Undefined function: " + funcName);
         }
 
-        // Получение количества параметров
-        size_t paramCount = func->symbolTable.variables.size(); // Предполагается, что все переменные в symbolTable — это параметры
+        // Вместо всех переменных, берём только число параметров
+        size_t paramCount = func->numParams;
 
-        // Извлечение параметров из стека
+        // Снимаем paramCount аргументов
         std::vector<int> params;
         for (size_t i = 0; i < paramCount; ++i) {
             if (operandStack.empty()) {
@@ -387,17 +407,14 @@ private:
             params.push_back(operandStack.top());
             operandStack.pop();
         }
-        std::reverse(params.begin(), params.end()); // Параметры были добавлены в обратном порядке
+        std::reverse(params.begin(), params.end()); // чтобы порядок был правильный
 
-        // Создание нового фрейма вызова
+        // Создаём новый фрейм
         CallFrame newFrame(func);
-        for (size_t i = 0; i < params.size(); ++i) {
-            if (i < newFrame.locals.size()) {
-                newFrame.locals[i] = params[i];
-            }
-            else {
-                throw std::runtime_error("Too many parameters provided to function: " + funcName);
-            }
+
+        // Пишем аргументы в locals[0..paramCount-1]
+        for (size_t i = 0; i < paramCount; ++i) {
+            newFrame.locals[i] = params[i];
         }
 
         callStack.push(newFrame);

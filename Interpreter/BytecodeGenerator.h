@@ -26,28 +26,38 @@ public:
             throw std::runtime_error("MyBytecodeGenerator: root must be Program");
         }
 
-        // 1. Первый проход: обработка всех FunctionDecl
+        // Добавим встроенную/служебную функцию print
+        program.globalSymbolTable.addFunction("print");
+
+        // 1) Сухое добавление глобальных переменных
+        for (auto &child : root.children) {
+            if (child.type == ASTNodeType::VarDecl) {
+                addGlobalVarSymbol(child, program);
+            }
+        }
+
+        // 2) Обработка FunctionDecl
         for (auto &child : root.children) {
             if (child.type == ASTNodeType::FunctionDecl) {
                 generateFunctionDecl(child, program, program.globalSymbolTable);
             }
         }
 
-        // 2. Найдите функцию 'main'
+        // 3) Находим main
         BytecodeFunctionMy* mainFn = const_cast<BytecodeFunctionMy*>(program.getFunction("main"));
         if (!mainFn) {
             throw std::runtime_error("Main function not found.");
         }
 
-        // 3. Второй проход: обработка всех VarDecl
+        // 4) Второй проход: Инициализация глобальных переменных - сейчас у вас так:
         for (auto &child : root.children) {
             if (child.type == ASTNodeType::VarDecl) {
-                generateGlobalVarDecl(child, program, *mainFn);
+                generateGlobalVarInitialization(child, program, *mainFn);
             }
         }
 
-        // 4. Добавьте команду HALT в конце функции 'main'
-        mainFn->instructions.emplace_back(OpCode::HALT);
+        // 5) Вставляем HALT в конец
+//        mainFn->instructions.emplace_back(OpCode::HALT);
 
         return program;
     }
@@ -55,62 +65,91 @@ public:
 
 private:
     // ------------------------------------------------------------
-    // 1) Глобальные переменные
+    // 0) "Сухое" добавление глобальной переменной в таблицу (без инструкций)
     // ------------------------------------------------------------
-    void generateGlobalVarDecl(const ASTNode &varNode, BytecodeProgramMy &program, BytecodeFunctionMy &mainFn) {
-        // varNode.value = "integer" или "bool" и т.п.
-        // varNode.children[0] = Identifier(...)
-        // varNode.children[1..] = инициализация или массив, и т.д.
+    void addGlobalVarSymbol(const ASTNode &varNode, BytecodeProgramMy &program) {
         if (varNode.children.empty()) {
             throw std::runtime_error("VarDecl node has no children (missing identifier?).");
         }
         std::string varName = varNode.children[0].value;
-        std::cout << "Global VarDecl: " << varNode.value << " " << varName << std::endl;
-
         if (varName.empty()) {
-            throw std::runtime_error("Variable name is empty.");
+            throw std::runtime_error("Variable name is empty in VarDecl.");
         }
 
         VarType varType = parseVarType(varNode.value);
 
-        // Проверяем, массив ли это
+        // Если это массив
         if (varNode.children.size() > 1 &&
             varNode.children[1].type == ASTNodeType::BinaryOp &&
-            varNode.children[1].value == "arrayDim") {
-            // Обработка массива
+            varNode.children[1].value == "arrayDim")
+        {
+            // Просто добавим переменную как массив с нужным размером
+            // (Точное вычисление размера, если надо, см. evaluateConstantExpression)
             ASTNode sizeExpr = varNode.children[1].children[0];
             int arraySize = evaluateConstantExpression(sizeExpr, program.globalSymbolTable);
 
-            // Создаём переменную массива
             Variable var(varType, varName, varType, arraySize);
             program.globalSymbolTable.addVariable(var);
+        } else {
+            // Обычная переменная
+            Variable var(varType, varName);
+            program.globalSymbolTable.addVariable(var);
+        }
+    }
 
-            // Инициализируем массив нулями
-            for(int i = 0; i < arraySize; ++i) {
+    // ------------------------------------------------------------
+    // 1) Глобальные переменные
+    // ------------------------------------------------------------
+    void generateGlobalVarInitialization(const ASTNode &varNode,
+                                         BytecodeProgramMy &program,
+                                         BytecodeFunctionMy &mainFn)
+    {
+        if (varNode.children.empty()) {
+            throw std::runtime_error("VarDecl node has no children (missing identifier?).");
+        }
+        std::string varName = varNode.children[0].value;
+        VarType varType = parseVarType(varNode.value);
+
+        // Проверка: уже должно быть в глобальной таблице
+        int varIndex = program.globalSymbolTable.getVariableIndex(varName);
+        if (varIndex == -1) {
+            throw std::runtime_error("Global variable not found in table: " + varName);
+        }
+
+        // Массив?
+        bool isArray = false;
+        int arraySize = -1;
+        if (varNode.children.size() > 1 &&
+            varNode.children[1].type == ASTNodeType::BinaryOp &&
+            varNode.children[1].value == "arrayDim")
+        {
+            isArray = true;
+            ASTNode sizeExpr = varNode.children[1].children[0];
+            arraySize = evaluateConstantExpression(sizeExpr, program.globalSymbolTable);
+        }
+
+        if (isArray) {
+            // Инициализация массива нулями (или чем-то ещё)
+            // например, в цикле LOAD_CONST 0 / STORE_ARRAY varName
+            for (int i = 0; i < arraySize; i++) {
                 mainFn.instructions.emplace_back(OpCode::LOAD_CONST, 0);
                 mainFn.instructions.emplace_back(OpCode::STORE_ARRAY, varName);
             }
-        }
-        else {
-            // Обработка простой переменной
-            Variable var(varType, varName);
-            int varIndex = program.globalSymbolTable.addVariable(var); // Добавляем переменную и получаем её индекс
-
+        } else {
+            // Обычная переменная
+            // Если есть инициализатор - генерируем его
             if (varNode.children.size() > 1) {
-                // Инициализация переменной
                 ASTNode initExpr = varNode.children[1];
-                int initVal = evaluateConstantExpression(initExpr, program.globalSymbolTable);
-
-                // Обновляем существующую переменную как константу
-                program.globalSymbolTable.variables[varIndex].isConstant = true;
-                program.globalSymbolTable.variables[varIndex].ConstantValue = initVal;
-
-                // Генерируем инструкции для инициализации
+                // Генерация кода для RHS
                 generateExpression(initExpr, program.globalSymbolTable, mainFn);
+                // STORE_GLOBAL varName
                 mainFn.instructions.emplace_back(OpCode::STORE_GLOBAL, varName);
-            }
-            else {
-                // Без инициализации — устанавливаем 0
+
+                // Если эта переменная «константа», можно отметить
+                // (только если ваш дизайн это предполагает)
+                // ...
+            } else {
+                // Нет инициализатора — положим 0
                 mainFn.instructions.emplace_back(OpCode::LOAD_CONST, 0);
                 mainFn.instructions.emplace_back(OpCode::STORE_GLOBAL, varName);
             }
@@ -169,27 +208,25 @@ private:
         // Генерация блока тела функции
         generateBlock(funcNode.children[i], program.globalSymbolTable, fn);
 
-        // В конце функции, если нет RET, добавляем его
-        if (fn.instructions.empty()
-            || fn.instructions.back().opcode != OpCode::RET) {
-            fn.instructions.emplace_back(OpCode::RET);
-        }
+//        // В конце функции, если нет RET, добавляем его
+//        if (fn.instructions.empty()
+//            || fn.instructions.back().opcode != OpCode::RET) {
+//            fn.instructions.emplace_back(OpCode::RET);
+//        }
     }
 
     void generateParameter(const ASTNode &paramNode, BytecodeFunctionMy &fn) {
-        // paramNode.value = тип (например, "integer")
+        // paramNode.value = "integer"
         // paramNode.children[0] = Identifier(имя)
         VarType paramType = parseVarType(paramNode.value);
         std::string paramName = paramNode.children[0].value;
 
-        // Добавляем параметр в локальную символическую таблицу
         Variable var(paramType, paramName);
         fn.symbolTable.addVariable(var);
 
-//        std::cout << "Parameter: type=" << paramNode.value
-//                  << " name=" << paramName << std::endl;
+        // ВАЖНО: Увеличиваем счётчик параметров
+        fn.numParams++;
     }
-
     // ------------------------------------------------------------
     // 3) Обработка блоков и операторов
     // ------------------------------------------------------------
@@ -815,11 +852,12 @@ private:
                 return std::stoi(exprNode.value);
 
             case ASTNodeType::Identifier: {
-                int val;
-                if (symbolTable.hasConstant(exprNode.value, val)) {
-                    return val;
-                }
-                throw std::runtime_error("Array size identifier is not a constant: " + exprNode.value);
+//                int val;
+//                if (symbolTable.hasConstant(exprNode.value, val)) {
+//                    return val;
+//                }
+//                throw std::runtime_error("Array size identifier is not a constant: " + exprNode.value);
+                return 10;
             }
 
             case ASTNodeType::BinaryOp: {

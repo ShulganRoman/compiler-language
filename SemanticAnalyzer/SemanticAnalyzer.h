@@ -43,6 +43,11 @@ private:
         if (!symbolTable.addSymbol(nullptrSymbol)) {
             throw std::runtime_error("Failed to add built-in symbol: nullptr");
         }
+
+        Symbol printSymbol("print", "void", true, {"integer"});
+        if (!symbolTable.addSymbol(printSymbol)) {
+            throw std::runtime_error("Failed to add built-in symbol: print");
+        }
     }
 
     std::string getBaseType(const std::string &type) const {
