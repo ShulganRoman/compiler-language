@@ -6,13 +6,6 @@
 #include <unordered_map>
 #include <string>
 
-/**
- * Описание "функции" в нашем байткоде.
- *  - name: имя функции
- *  - instructions: список команд
- *  - symbolTable: таблица локальных переменных
- *  - numParams: количество параметров
- */
 struct BytecodeFunctionMy {
     std::string name;
     std::vector<InstructionMy> instructions;
@@ -24,12 +17,6 @@ struct BytecodeFunctionMy {
             : name(fname) {}
 };
 
-/**
- * Основная "программа" байткода:
- *  - глобальные переменные (symbolTable)
- *  - список функций
- *  - map <имяФункции -> индекс>
- */
 class BytecodeProgramMy {
 public:
     InterpreterSymbolTable globalSymbolTable;

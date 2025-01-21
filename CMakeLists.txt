@@ -28,11 +28,11 @@ add_executable(compiler_language
         SemanticAnalyzer/SymbolTable.h
         LLVM/CodeGenerator.h
         LLVM/CodeGenerator.cpp
-        Interpreter/InstructionMy.h
-        Interpreter/BytecodeGenerator.h
-        Interpreter/BytecodeProgramMy.h
+        BytecodeGen/InstructionMy.h
+        BytecodeGen/BytecodeGenerator.h
+        BytecodeGen/BytecodeProgramMy.h
         VM.h
-        Interpreter/InterpreterSymbolTable.h
+        BytecodeGen/BytecodeSymbolTable.h
         Parser_AST/AST_Optimizer.h
         tasksC++/test.h
 )

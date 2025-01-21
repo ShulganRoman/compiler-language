@@ -6,8 +6,6 @@
 #include <stdexcept>
 #include <iostream>
 
-
-
 enum class OpCode : uint8_t {
     // Работа с памятью
     LOAD_GLOBAL,     // Загрузить значение глобальной переменной в стек (operandStr = имя)
@@ -48,9 +46,6 @@ enum class OpCode : uint8_t {
     HALT            // Конец программы
 };
 
-/**
- * Структура одной инструкции.
- */
 struct InstructionMy {
     OpCode opcode {OpCode::LOAD_CONST};
     int64_t operandInt {0};        // Для индексов, значений

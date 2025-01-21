@@ -5,6 +5,6 @@ integer factorial_calc(integer num){
 }
 
 integer main(){
-    print(factorial_calc(6));
+    print(factorial_calc(11));
     return 0;
 }

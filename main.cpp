@@ -13,7 +13,6 @@
 #include <llvm/Support/raw_ostream.h>
 #include <memory>
 
-// Функция для красивой печати AST
 void printAST(const ASTNode &node, int indent=0) {
     std::string prefix(indent, ' ');
 
@@ -27,10 +26,7 @@ void printAST(const ASTNode &node, int indent=0) {
 }
 
 int main(int argc, char** argv) {
-    // -----------------------------------------------------------------
     // 1) Разбор аргументов командной строки
-    // -----------------------------------------------------------------
-
     if (argc < 2) {
         std::cerr << "Usage: " << argv[0]
                   << " input.lcpp [--run] [--tokens] [--ast] [--llvm] [--O2] [-o out.bc]\n";
@@ -87,9 +83,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // -----------------------------------------------------------------
     // 2) Читаем исходный файл .lcpp в строку "code"
-    // -----------------------------------------------------------------
     std::ifstream ifs(inputFile);
     if (!ifs.is_open()) {
         std::cerr << "Error: cannot open file " << inputFile << "\n";
@@ -98,9 +92,7 @@ int main(int argc, char** argv) {
     std::string code((std::istreambuf_iterator<char>(ifs)),
                      std::istreambuf_iterator<char>());
 
-    // -----------------------------------------------------------------
     // 3) Лексер
-    // -----------------------------------------------------------------
     Lexer lexer(code);
     auto tokens = lexer.getTokens();
 
@@ -114,9 +106,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    // -----------------------------------------------------------------
     // 4) Парсер
-    // -----------------------------------------------------------------
     Parser parser(tokens);
     ASTNode root;
     try {
@@ -132,9 +122,7 @@ int main(int argc, char** argv) {
         printAST(root, 0);
     }
 
-    // -----------------------------------------------------------------
     // 5) Семантический анализ
-    // -----------------------------------------------------------------
     SemanticAnalyzer analyzer(root);
     try {
         analyzer.analyze();
@@ -144,10 +132,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // -----------------------------------------------------------------
     // 6) Оптимизации на AST
-    // -----------------------------------------------------------------
-    // Если хотите implement optimizeO2 = true → constant folding, etc.
     if (optimizeO2) {
         SemanticAnalyzer analyzer(root);
         analyzer.analyze();
@@ -157,10 +142,7 @@ int main(int argc, char** argv) {
         optimizer.optimize(root);
     }
 
-    // -----------------------------------------------------------------
     // 7) Генерация LLVM IR
-    // -----------------------------------------------------------------
-
 //    if (showLLVM) {
 //        try {
 //            CodeGenerator codeGen(analyzer.getSymbolTable());
@@ -172,10 +154,7 @@ int main(int argc, char** argv) {
 //        }
 //    }
 
-
-    // -----------------------------------------------------------------
     // 8) Генерация байткода
-    // -----------------------------------------------------------------
     MyBytecodeGenerator generator;
     BytecodeProgramMy program;
     try {
@@ -208,9 +187,7 @@ int main(int argc, char** argv) {
         std::cout << "Bytecode saved to " << outputFile << "\n";
     }
 
-    // -----------------------------------------------------------------
     // 9) Если флаг --run, то запускаем нашу VM
-    // -----------------------------------------------------------------
     if (doRun) {
         std::cout << "\n=== VM EXECUTION ===\n";
         VirtualMachine vm(program);

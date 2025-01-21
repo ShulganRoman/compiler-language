@@ -7,9 +7,6 @@
 #include <iostream>
 #include <stack>
 
-/**
- * Типы переменных
- */
 enum class VarType {
     INTEGER,
     FLOAT,
@@ -19,39 +16,32 @@ enum class VarType {
     ARRAY
 };
 
-/**
- * Класс для описания переменной
- */
 class Variable {
 public:
     std::string name;
     VarType type;
     bool isConstant;
-    int ConstantValue; // Только для констант
-    int arraySize; // Только для массивов, -1 если не массив
+    int ConstantValue;
+    int arraySize; // -1 если не массив
 
-    // Конструктор для обычной переменной
+    // для обычной переменной
     Variable(VarType type, const std::string &name)
             : type(type), name(name), isConstant(false), ConstantValue(0), arraySize(-1) {}
 
-    // Конструктор для массива
+    // для массива
     Variable(VarType type, const std::string &name, VarType varType, int arraySize)
             : type(type), name(name), isConstant(false), ConstantValue(0), arraySize(arraySize) {}
 
-    // Метод для установки переменной как константы
+    // для установки переменной как константы
     void setConstant(int val) {
         isConstant = true;
         ConstantValue = val;
     }
 };
 
-/**
- * Символическая таблица с поддержкой областей видимости
- */
-class InterpreterSymbolTable {
+class BytecodeSymbolTable {
 public:
-    InterpreterSymbolTable() {
-        // Инициализируем глобальную область видимости
+    BytecodeSymbolTable() {
         enterScope();
     }
 
@@ -155,10 +145,8 @@ public:
     std::vector<Variable> variables;
 
 private:
-    // Стек областей видимости: каждая область видимости — это map <имя переменной, индекс в variables>
     std::vector<std::unordered_map<std::string, int>> scopes;
 
-    // Переменные
     std::unordered_map<std::string, int> functions; // Имя функции -> индекс
     std::vector<std::string> functionList; // Список функций
 };

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "Interpreter/InstructionMy.h"
-#include "Interpreter/BytecodeProgramMy.h"
-#include "Interpreter/InterpreterSymbolTable.h"
+#include "BytecodeGen/InstructionMy.h"
+#include "BytecodeGen/BytecodeProgramMy.h"
+#include "BytecodeGen/BytecodeSymbolTable.h"
 
 #include <stack>
 #include <unordered_map>
@@ -27,13 +27,12 @@ public:
             : program(program), halted(false) {}
 
     void execute() {
-        // Инициализация фрейма вызова для функции main
+        // Инициализация вызова для функции main
         const BytecodeFunctionMy* mainFn = program.getFunction("main");
         if (!mainFn) {
             throw std::runtime_error("Main function not found.");
         }
 
-        // Инициализируем фрейм вызова для main
         CallFrame mainFrame(mainFn);
         callStack.push(mainFrame);
 
@@ -189,8 +188,6 @@ private:
         }
     }
 
-    // Методы обработки опкодов
-
     // Работа с памятью
     void loadGlobal(const std::string& varName) {
         if (globalVariables.find(varName) == globalVariables.end()) {
@@ -312,7 +309,6 @@ private:
         int index = operandStack.top();
         operandStack.pop();
 
-        // Если массив не найден, создадим "по умолчанию" 10000 элементов
         if (globalArrays.find(arrayName) == globalArrays.end()) {
             globalArrays[arrayName] = std::vector<int>(10000, 0);
         }
@@ -333,7 +329,6 @@ private:
         int index = operandStack.top();
         operandStack.pop();
 
-        // Если массива нет, создадим также
         if (globalArrays.find(arrayName) == globalArrays.end()) {
             globalArrays[arrayName] = std::vector<int>(10000, 0);
         }
@@ -369,7 +364,6 @@ private:
 
     void callFunction(const std::string& funcName) {
         if (funcName == "print") {
-            // один аргумент
             if (operandStack.empty()) {
                 throw std::runtime_error("Operand stack underflow on CALL print.");
             }
@@ -396,7 +390,7 @@ private:
             params.push_back(operandStack.top());
             operandStack.pop();
         }
-        std::reverse(params.begin(), params.end()); // чтобы порядок был правильный
+        std::reverse(params.begin(), params.end());
 
         // Создаём новый фрейм
         CallFrame newFrame(func);

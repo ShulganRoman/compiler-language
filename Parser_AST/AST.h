@@ -275,7 +275,7 @@ private:
             throw std::runtime_error("Expected ';' after var_decl");
         }
         advance(); // ';'
-//        std::cout << "parseVarDecl found varName='" << ident.name << "', type='" << typeKw.name << "', isArray=" << "..." << "\n";
+    //        std::cout << "parseVarDecl found varName='" << ident.name << "', type='" << typeKw.name << "', isArray=" << "..." << "\n";
         return varDecl;
     }
 
@@ -339,7 +339,7 @@ private:
             return parseReturnStatement();
         }
 
-        // Попытаемся парсить var_decl
+        // Попытка парсить var_decl
         {
             size_t oldPos = position;
             std::string mods = parseModifiers();
@@ -485,7 +485,7 @@ private:
         ASTNode varName(ASTNodeType::Identifier, ident.name);
         varDecl.addChild(varName);
 
-        // опять же, проверяем массивные размерности
+        // опять же, проверяем размерность массива
         parseArrayDims(varName);
 
         if (match(TypeOfVar::_operator, "=")) {
@@ -745,7 +745,7 @@ private:
             return baseNode;
         }
         // Добавим проверку:
-// primary -> 'new' type(' *')? '[' assignmentExpr ']'
+        // primary -> 'new' type(' *')? '[' assignmentExpr ']'
         if (match(TypeOfVar::_keyword, "new")) {
             advance(); // съедаем "new"
 
